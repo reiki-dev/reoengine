@@ -85,8 +85,14 @@ class ProcessTests(TemporaryTest):
                 marker = self.directory / f"{mode}.txt"
                 result = run_process([*self.command("codex", mode), str(marker)], cwd=self.directory,
                                      timeout=0.5, stdin_text="")
-                self.assertTrue(result.timed_out)
+                if mode == "tree":
+                    self.assertTrue(result.timed_out)
+                # tree_parent_exit: the background child is torn down when the parent exits.
                 child_pid = int(marker.with_suffix(".pid").read_text())
+                for _ in range(40):  # allow init to reap the killed orphan
+                    if not state.pid_alive(child_pid):
+                        break
+                    time.sleep(0.05)
                 self.assertFalse(state.pid_alive(child_pid))
                 time.sleep(1.6)
                 self.assertFalse(marker.exists())

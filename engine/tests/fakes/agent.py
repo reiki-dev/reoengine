@@ -50,6 +50,13 @@ def main() -> None:
         marker.with_suffix(".pid").write_text(str(child.pid), encoding="utf-8")
         if mode == "tree":
             time.sleep(30)
+        if mode == "tree_setsid":
+            # Wait until the child has left the process group, so the test is not racy.
+            ready = marker.with_suffix(".ready")
+            for _ in range(200):
+                if ready.exists():
+                    break
+                time.sleep(0.05)
         return
     if mode == "child":
         time.sleep(1.5)
@@ -57,6 +64,7 @@ def main() -> None:
         return
     if mode == "setsid_child":
         os.setsid()
+        Path(arguments[0]).with_suffix(".ready").write_text("1", encoding="utf-8")
         time.sleep(30)
         Path(arguments[0]).write_text("survived", encoding="utf-8")
         return
