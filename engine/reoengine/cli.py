@@ -26,6 +26,7 @@ from .gc import collect_failures, collect_run_links, usage_size_warnings
 from .preflight import preflight, settings_lock
 from .schemas import normalize_input_plan, validate_artifact
 from .state import RunLockedError, RunState, Status, load_state
+from .review_cli import apply_run, export_run, list_runs, print_review, show_run, roles_output
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -57,6 +58,19 @@ def parser() -> argparse.ArgumentParser:
     resume.add_argument("--allow-legacy-argv-checks", action="store_true")
     status = commands.add_parser("status")
     status.add_argument("run_id", nargs="?")
+    listing = commands.add_parser("list", help="List recent runs")
+    listing.add_argument("--status", choices=[status.value for status in Status])
+    listing.add_argument("--limit", type=int, default=20)
+    show = commands.add_parser("show", help="Show run review details")
+    show.add_argument("run_id")
+    export = commands.add_parser("export", help="Export shareable run artifacts")
+    export.add_argument("run_id")
+    export.add_argument("--output")
+    apply = commands.add_parser("apply", help="Apply a run on a new local branch")
+    apply.add_argument("run_id")
+    apply.add_argument("--to-branch", required=True)
+    role_list = commands.add_parser("roles", help="Show effective role configuration")
+    role_list.add_argument("--roles", help="Use a roles TOML file (relative to config directory or absolute)")
     approve = commands.add_parser("approve", help="Approve an awaiting_human run")
     approve.add_argument("run_id")
     reject = commands.add_parser("reject", help="Reject an awaiting_human run")
@@ -162,6 +176,7 @@ def _report(state: RunState, directory: Path, out: TextIO) -> int:
     print(f"{state.run_id}: {state.status.value}; stage={state.stage.value}; attempt={state.attempt}", file=out)
     if state.status == Status.AWAITING_HUMAN:
         print(f"diff: {directory / 'review/diff.patch'}\nchecks: {directory / 'gates.json'}", file=out)
+        print_review(directory, out)
     if state.status == Status.FAILED and (directory / "error.json").is_file():
         data = object_value(loads((directory / "error.json").read_text(encoding="utf-8")), "error")
         print(f"error: {data.get('error')}", file=out)
@@ -220,6 +235,38 @@ def main(argv: Sequence[str] | None = None, *, adapters: Mapping[Engine, Adapter
                 for path in sorted(dirs.runs.glob("*/state.json")):
                     directory_path = _run_path(dirs.runs, path.parent.name)
                     _report(load_state(directory_path), directory_path, output)
+            return 0
+        if command == "list":
+            limit = args.get("limit")
+            if not isinstance(limit, int) or limit < 0:
+                raise ValueError("limit must be a nonnegative integer")
+            status_filter = args.get("status")
+            return list_runs(dirs.runs, output, status_filter if isinstance(status_filter, str) else None, limit)
+        if command == "show":
+            directory_path = _run_path(dirs.runs, args.get("run_id"))
+            return show_run(load_state(directory_path), directory_path, output)
+        if command == "export":
+            identifier = _identifier(args.get("run_id"), "run_id")
+            directory_path = _run_path(dirs.runs, identifier)
+            target_arg = args.get("output")
+            target = Path(string(target_arg, "output")) if target_arg is not None else Path.cwd() / f"reoengine-export-{identifier}"
+            export_run(directory_path, identifier, target)
+            return 0
+        if command == "roles":
+            configured = load_configuration(dirs.config, roles_file=roles_file)
+            roles_output(configured, dirs.state, output)
+            return 0
+        if command == "apply":
+            identifier = _identifier(args.get("run_id"), "run_id")
+            directory_path = _run_path(dirs.runs, identifier)
+            state = load_state(directory_path)
+            launch = object_value(loads((directory_path / "launch.json").read_text(encoding="utf-8")), "launch")
+            configured = load_configuration(dirs.config, dirs.state, roles_file)
+            project_name = _identifier(launch.get("project"), "project")
+            if project_name not in configured.projects:
+                raise ValueError("run project is not configured")
+            branch = _identifier(args.get("to_branch"), "branch")
+            apply_run(directory_path, state, configured.projects[project_name].repo, branch, output)
             return 0
         if command == "switch":
             return _switch(args, dirs, output)

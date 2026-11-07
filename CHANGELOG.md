@@ -5,6 +5,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- CLI review commands: `list`, `show`, `export`, `apply`, and `roles`, with findings and diffstat at human review.
 - Complete example project, task, and plan; offline hello-world demo; Python and Node profiles.
 - `tune` command (the former `preflight`, which remains as a deprecated alias).
 - `review_max_diff_lines`: runs whose diff exceeds it stop with `diff_too_large`.
