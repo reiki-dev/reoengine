@@ -34,8 +34,8 @@ See [known limits](docs/SECURITY_AND_COMPLIANCE.md#6-known-limits-read-before-re
 ## Install
 
 ```bash
-git clone <this repository>
-cd <repository>
+git clone https://github.com/reiki-dev/reoengine.git
+cd reoengine
 python -m pip install ./engine        # installs the `reoengine` and `reona` commands
 reoengine doctor                      # checks git, vendor CLIs and configuration
 ```
@@ -125,8 +125,6 @@ Search for these and replace them:
 |---|---|---|
 | Copyright holder `reiki-dev` | `NOTICE` | Already set to the publisher handle; change it if the holder should be a person or company |
 | Private vulnerability reporting | GitHub repository settings | Enable it (Security tab); `SECURITY.md` relies on it |
-| `<this repository>` | `README.md` (Install) | Public clone URL |
-| Repository URL fields | `engine/pyproject.toml` (`[project.urls]`, not yet set) | Public repository URL |
 | Provider prices | `config/pricing.toml` | Current prices per million tokens from your provider; ships empty |
 
 ## License

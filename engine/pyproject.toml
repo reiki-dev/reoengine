@@ -6,6 +6,9 @@ requires-python = ">=3.11"
 dependencies = []
 license = { text = "Apache-2.0" }
 
+[project.urls]
+Repository = "https://github.com/reiki-dev/reoengine"
+
 [project.scripts]
 reoengine = "reona.cli:main"
 reona = "reona.cli:main"
