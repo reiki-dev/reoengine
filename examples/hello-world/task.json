@@ -1,0 +1,16 @@
+{
+  "id": "HELLO-1",
+  "title": "Return a friendly greeting",
+  "description": "Update the greeting module to return Hello, world!.",
+  "requirements": [
+    {
+      "id": "R1",
+      "description": "The greeting function returns Hello, world!.",
+      "verification": "The unit-tests check passes."
+    }
+  ],
+  "allowed_paths": ["src/**", "tests/**"],
+  "acceptance_checks": ["unit-tests"],
+  "tdd_gate": true,
+  "profile": "default"
+}

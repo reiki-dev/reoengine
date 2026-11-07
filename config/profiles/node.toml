@@ -1,0 +1,6 @@
+skills = []
+max_skills = 8
+max_skill_tokens = 12000
+blocked_paths = [".env*", "*.db", "*.db-shm", "*.db-wal", "*.pem", "*.key", "secrets/**", "node_modules/**"]
+rules = "Keep changes small. Do not read or modify secrets or real data. Run the configured checks offline. Do not change files outside allowed_paths."
+checks = [["npm", "test"]]

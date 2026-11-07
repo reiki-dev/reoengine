@@ -1,0 +1,8 @@
+# Used by setup.py with EXAMPLE_REPO set to the temporary sample repository.
+repo = "${ENV:EXAMPLE_REPO}"
+profile = "default"
+allowed_paths = ["src/**", "tests/**"]
+checks = []
+
+[acceptance]
+unit-tests = ["${ENV:EXAMPLE_PYTHON}", "-B", "-m", "unittest", "discover", "-s", "tests"]

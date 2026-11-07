@@ -1,0 +1,16 @@
+{
+  "id": "HELLO-1",
+  "title": "Add a greeting",
+  "description": "Add a small greeting function and a unit test for it.",
+  "requirements": [
+    {
+      "id": "R1",
+      "description": "The greeting function returns Hello, world!.",
+      "verification": "Run the unit-tests acceptance check."
+    }
+  ],
+  "allowed_paths": ["src/**", "tests/**"],
+  "acceptance_checks": ["unit-tests"],
+  "tdd_gate": true,
+  "profile": "default"
+}

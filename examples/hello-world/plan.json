@@ -1,0 +1,13 @@
+{
+  "approach": "Change the greeting function and run its unit test.",
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Return the requested greeting from src/greeting.py.",
+      "role": null
+    }
+  ],
+  "allowed_paths": ["src/**", "tests/**"],
+  "acceptance_checks": ["unit-tests"],
+  "risks": []
+}

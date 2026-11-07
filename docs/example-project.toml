@@ -1,3 +1,13 @@
-# Minimal project configuration example. Copy to config/projects/<name>.local.toml (git-ignored) and set EXAMPLE_REPO.
+# Copy to config/projects/<project>.toml and set EXAMPLE_REPO to an absolute Git repository path.
+# Each acceptance entry maps a trusted check ID to an argv array (no shell is used).
 repo = "${ENV:EXAMPLE_REPO}"
 profile = "default"
+allowed_paths = ["src/**", "tests/**"]
+checks = []
+offline_env = {}
+links = {}
+exclude_from_worktree = []
+high_risk_paths = []
+
+[acceptance]
+unit-tests = ["python", "-m", "unittest", "discover", "-s", "tests"]

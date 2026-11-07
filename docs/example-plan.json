@@ -1,0 +1,13 @@
+{
+  "approach": "Implement the greeting and verify it with the unit test suite.",
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Add the greeting function and its unit test.",
+      "role": null
+    }
+  ],
+  "allowed_paths": ["src/**", "tests/**"],
+  "acceptance_checks": ["unit-tests"],
+  "risks": []
+}

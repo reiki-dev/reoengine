@@ -42,6 +42,16 @@ reoengine doctor                      # checks git, vendor CLIs and configuratio
 
 Or run in place, without installing: `cd engine && python -m reoengine doctor`.
 
+## Try it in 2 minutes
+
+Run the offline demo from the repository root. It uses a scripted fake agent and needs no API key:
+
+```bash
+python examples/hello-world/setup.py
+```
+
+See [examples/hello-world](examples/hello-world/README.md) for the expected `awaiting_human` result and the run artifacts to inspect.
+
 You also need `git`, and whichever vendor CLIs you choose to use for roles (`codex`, `claude`,
 `agy`) installed and signed in, or an API key in an environment variable such as `GEMINI_API_KEY`.
 
