@@ -38,9 +38,9 @@ class Directories:
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(prog="reona")
+    result = argparse.ArgumentParser(prog="reoengine")
     for name in ("config", "state", "runs"):
-        result.add_argument(f"--{name}-dir", help=f"Override {name}/ (or REONA_{name.upper()}_DIR)")
+        result.add_argument(f"--{name}-dir", help=f"Override {name}/ (or REOENGINE_{name.upper()}_DIR)")
     commands = result.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run", help="Run a task in a separate worktree")
     run.add_argument("project")
@@ -188,7 +188,7 @@ def main(argv: Sequence[str] | None = None, *, adapters: Mapping[Engine, Adapter
 
         def directory(name: str, injected: Path | None) -> Path:
             argument = args.get(f"{name}_dir")
-            value = string(argument, name) if argument is not None else os.environ.get(f"REONA_{name.upper()}_DIR")
+            value = string(argument, name) if argument is not None else os.environ.get(f"REOENGINE_{name.upper()}_DIR")
             return (injected or (Path(value) if value else base / name)).resolve()
 
         dirs = Directories(directory("config", config_directory), directory("state", state_directory), directory("runs", runs_directory))

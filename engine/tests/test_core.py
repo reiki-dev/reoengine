@@ -17,16 +17,16 @@ from unittest.mock import call, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from reona import state
-from reona._data import append_line, atomic_write, encode, read_lines
-from reona.adapters import AgyAdapter, ClaudeAdapter, CodexAdapter, ErrorKind, codex_rate_limits
-from reona.config import (Effort, Engine, QuotaConfig, RoleConfig, Sandbox, effective_roles, load_configuration,
+from reoengine import state
+from reoengine._data import append_line, atomic_write, encode, read_lines
+from reoengine.adapters import AgyAdapter, ClaudeAdapter, CodexAdapter, ErrorKind, codex_rate_limits
+from reoengine.config import (Effort, Engine, QuotaConfig, RoleConfig, Sandbox, effective_roles, load_configuration,
                           load_limits, load_profile, load_project, load_roles)
-from reona.events import Event, EventKind, EventLog, LimitRemaining, sha256_file
-from reona.procs import command_line, resolve_executable, run_process
-from reona.schemas import SchemaError, load_schema, validate, validate_artifact
-from reona.state import RunLock, RunLockedError, RunState, Stage, Status, load_state, save_state
-from reona.usage import TokenUsage, UsageLog, UsageRecord
+from reoengine.events import Event, EventKind, EventLog, LimitRemaining, sha256_file
+from reoengine.procs import command_line, resolve_executable, run_process
+from reoengine.schemas import SchemaError, load_schema, validate, validate_artifact
+from reoengine.state import RunLock, RunLockedError, RunState, Stage, Status, load_state, save_state
+from reoengine.usage import TokenUsage, UsageLog, UsageRecord
 
 ROOT = Path(__file__).resolve().parents[2]
 FAKE = Path(__file__).resolve().parent / "fakes" / "agent.py"
@@ -107,7 +107,7 @@ class ProcessTests(TemporaryTest):
 
     @unittest.skipUnless(os.name == "nt", "Windows batch shim")
     def test_cmd_shim_and_pathext(self) -> None:
-        with patch.dict(os.environ, {"REONA_TEST_PYTHON":sys.executable}):
+        with patch.dict(os.environ, {"REOENGINE_TEST_PYTHON":sys.executable}):
             output = self.directory / "кириллица & space.json"
             shim_directory = self.directory / "shim space & кириллица"
             shim_directory.mkdir()
@@ -145,10 +145,10 @@ class AdapterTests(TemporaryTest):
 
         self.directory = IsolatedPath(boundary)
         self.home = IsolatedPath.home()
-        paths = patch("reona.adapters.claude.Path", IsolatedPath)
+        paths = patch("reoengine.adapters.claude.Path", IsolatedPath)
         paths.start()
         self.addCleanup(paths.stop)
-        path_helpers = patch("reona.paths.Path", IsolatedPath)
+        path_helpers = patch("reoengine.paths.Path", IsolatedPath)
         path_helpers.start()
         self.addCleanup(path_helpers.stop)
 
@@ -210,7 +210,7 @@ class AdapterTests(TemporaryTest):
         errors = (FileNotFoundError("synthetic missing git"), ValueError("synthetic invalid cwd"),
                   subprocess.TimeoutExpired("git", 5))
         for error in errors:
-            with self.subTest(error=error), patch("reona.adapters.codex.subprocess.run", side_effect=error):
+            with self.subTest(error=error), patch("reoengine.adapters.codex.subprocess.run", side_effect=error):
                 result = CodexAdapter(self.command("codex")).invoke(role, self.prompt, self.directory, 5)
                 self.assertTrue(result.success, result)
                 message = json.loads(result.final_message_path.read_text(encoding="utf-8"))
@@ -275,7 +275,7 @@ class AdapterTests(TemporaryTest):
                 instruction.parent.mkdir(parents=True, exist_ok=True)
                 instruction.write_text("synthetic project instructions", encoding="utf-8")
                 try:
-                    with self.subTest(instruction=instruction), patch("reona.adapters.claude.invoke_json") as invoke:
+                    with self.subTest(instruction=instruction), patch("reoengine.adapters.claude.invoke_json") as invoke:
                         with self.assertRaisesRegex(ValueError, "inherits project instructions") as error:
                             ClaudeAdapter(neutral, self.command("claude"))
                         self.assertIn(str(instruction), str(error.exception))
@@ -287,7 +287,7 @@ class AdapterTests(TemporaryTest):
         adapter = ClaudeAdapter(self.directory / "neutral", self.command("claude"))
         (self.directory / "CLAUDE.local.md").write_text("synthetic", encoding="utf-8")
         role = RoleConfig(Engine.CLAUDE, "opus", neutral_cwd=True)
-        with patch("reona.adapters.claude.invoke_json") as invoke:
+        with patch("reoengine.adapters.claude.invoke_json") as invoke:
             with self.assertRaisesRegex(ValueError, "inherits project instructions"):
                 adapter.invoke(role, self.prompt, self.directory, 5)
             invoke.assert_not_called()
@@ -323,7 +323,7 @@ class AdapterTests(TemporaryTest):
 
     def test_claude_allows_global_home_instructions(self) -> None:
         instruction = self.global_claude_instructions()
-        neutral = self.home / "AppData" / "Local" / "reona" / "neutral"
+        neutral = self.home / "AppData" / "Local" / "reoengine" / "neutral"
         neutral.mkdir(parents=True)
         adapter = ClaudeAdapter(neutral, self.command("claude"))
         self.assertEqual(adapter.neutral_directory, neutral.resolve())
@@ -331,7 +331,7 @@ class AdapterTests(TemporaryTest):
 
     def test_claude_global_exception_does_not_allow_project_instructions(self) -> None:
         self.global_claude_instructions()
-        neutral = self.home / "AppData" / "Local" / "reona" / "neutral"
+        neutral = self.home / "AppData" / "Local" / "reoengine" / "neutral"
         for ancestor in (self.home, neutral.parent):
             for relative in ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md"):
                 if ancestor == self.home and relative == ".claude/CLAUDE.md":
@@ -350,8 +350,8 @@ class AdapterTests(TemporaryTest):
     @unittest.skipUnless(os.name == "nt", "Windows case-insensitive paths")
     def test_claude_global_home_comparison_ignores_case_on_windows(self) -> None:
         self.global_claude_instructions()
-        neutral = self.home / "AppData" / "Local" / "reona" / "neutral"
-        with patch("reona.adapters.claude.Path.home", return_value=Path(str(self.home).upper())):
+        neutral = self.home / "AppData" / "Local" / "reoengine" / "neutral"
+        with patch("reoengine.adapters.claude.Path.home", return_value=Path(str(self.home).upper())):
             ClaudeAdapter(neutral, self.command("claude"))
 
     def test_claude_default_directory_uses_localappdata(self) -> None:
@@ -359,7 +359,7 @@ class AdapterTests(TemporaryTest):
         local_app_data = self.home / "AppData" / "Local"
         with patch.dict(os.environ, {"LOCALAPPDATA": str(local_app_data)}):
             adapter = ClaudeAdapter(command=self.command("claude"))
-        self.assertEqual(adapter.neutral_directory, local_app_data / "reona" / "neutral")
+        self.assertEqual(adapter.neutral_directory, local_app_data / "reoengine" / "neutral")
         result = adapter.invoke(RoleConfig(Engine.CLAUDE, "opus", neutral_cwd=True), self.prompt, self.directory, 5)
         self.assertTrue(result.success, result)
         message = json.loads(result.final_message_path.read_text(encoding="utf-8"))
@@ -369,7 +369,7 @@ class AdapterTests(TemporaryTest):
     def test_claude_default_directory_uses_home_state_path_without_localappdata(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             adapter = ClaudeAdapter()
-            self.assertEqual(adapter.neutral_directory, self.home / ".local" / "state" / "reona" / "neutral")
+            self.assertEqual(adapter.neutral_directory, self.home / ".local" / "state" / "reoengine" / "neutral")
             ClaudeAdapter(self.directory / "neutral", self.command("claude"))
 
     def test_response_schema(self) -> None:
@@ -384,7 +384,7 @@ class AdapterTests(TemporaryTest):
     def test_codex_via_cmd(self) -> None:
         if os.name != "nt":
             self.skipTest("Windows batch shim")
-        with patch.dict(os.environ, {"REONA_TEST_PYTHON":sys.executable}):
+        with patch.dict(os.environ, {"REOENGINE_TEST_PYTHON":sys.executable}):
             result = CodexAdapter((str(FAKE.parent / "echo_stdin.cmd"),)).invoke(RoleConfig(Engine.CODEX, "synthetic"), self.prompt, self.directory, 5)
         self.assertTrue(result.success, result)
 
@@ -425,7 +425,7 @@ class ConfigurationTests(TemporaryTest):
 
     def test_engine_version_matches_package_metadata(self) -> None:
         metadata = tomllib.loads((ROOT / "engine" / "pyproject.toml").read_text(encoding="utf-8"))
-        from reona import __version__
+        from reoengine import __version__
         self.assertEqual(metadata["project"]["version"], __version__)
 
     def test_override_precedence_and_unknown_key(self) -> None:
@@ -538,9 +538,9 @@ class StateAndLogTests(TemporaryTest):
                 raise PermissionError("synthetic locked destination")
             real_replace(source, destination)
 
-        with patch("reona._data._ATOMIC_REPLACE_ATTEMPTS", 20), \
-                patch("reona._data.os.replace", side_effect=interrupted_replace) as replacing, \
-                patch("reona._data.time.sleep") as sleeping:
+        with patch("reoengine._data._ATOMIC_REPLACE_ATTEMPTS", 20), \
+                patch("reoengine._data.os.replace", side_effect=interrupted_replace) as replacing, \
+                patch("reoengine._data.time.sleep") as sleeping:
             atomic_write(path, {"attempt": 2})
         self.assertEqual(replacing.call_count, 4)
         self.assertEqual(sleeping.call_args_list, [call(0.05)] * 3)
@@ -552,9 +552,9 @@ class StateAndLogTests(TemporaryTest):
         original = encode({"attempt": 1})
         path.write_bytes(original)
         errors = [PermissionError(f"synthetic locked destination {attempt}") for attempt in range(20)]
-        with patch("reona._data._ATOMIC_REPLACE_ATTEMPTS", 20), \
-                patch("reona._data.os.replace", side_effect=errors) as replacing, \
-                patch("reona._data.time.sleep") as sleeping:
+        with patch("reoengine._data._ATOMIC_REPLACE_ATTEMPTS", 20), \
+                patch("reoengine._data.os.replace", side_effect=errors) as replacing, \
+                patch("reoengine._data.time.sleep") as sleeping:
             with self.assertRaises(PermissionError) as raised:
                 atomic_write(path, {"attempt": 2})
         self.assertIs(raised.exception, errors[-1])
@@ -569,9 +569,9 @@ class StateAndLogTests(TemporaryTest):
                  (20, OSError("synthetic interrupted replace")))
         for attempts, error in cases:
             with self.subTest(attempts=attempts, error=error), \
-                    patch("reona._data._ATOMIC_REPLACE_ATTEMPTS", attempts), \
-                    patch("reona._data.os.replace", side_effect=error) as replacing, \
-                    patch("reona._data.time.sleep") as sleeping:
+                    patch("reoengine._data._ATOMIC_REPLACE_ATTEMPTS", attempts), \
+                    patch("reoengine._data.os.replace", side_effect=error) as replacing, \
+                    patch("reoengine._data.time.sleep") as sleeping:
                 with self.assertRaises(type(error)) as raised:
                     atomic_write(path, {"attempt": 1})
                 self.assertIs(raised.exception, error)
@@ -584,7 +584,7 @@ class StateAndLogTests(TemporaryTest):
         initial = RunState("test", Stage.IMPLEMENT, Status.RUNNING, 1, "base", "head", {"plan":"a"*64})
         save_state(self.directory, initial)
         self.assertEqual(load_state(self.directory), initial)
-        with patch("reona._data.os.replace", side_effect=OSError("synthetic interrupted replace")):
+        with patch("reoengine._data.os.replace", side_effect=OSError("synthetic interrupted replace")):
             with self.assertRaises(OSError):
                 save_state(self.directory, replace(initial, attempt=2))
         self.assertEqual(load_state(self.directory), initial)
@@ -665,7 +665,7 @@ class StateAndLogTests(TemporaryTest):
                 return real_write(fd, data[:7])
             raise OSError("synthetic interrupted write")
 
-        with patch("reona._data.os.write", side_effect=failing_write):
+        with patch("reoengine._data.os.write", side_effect=failing_write):
             with self.assertRaisesRegex(OSError, "synthetic interrupted write"):
                 log.append(record)
         self.assertEqual(calls, 2)
@@ -678,10 +678,10 @@ class StateAndLogTests(TemporaryTest):
     def test_append_short_writes_and_zero_progress(self) -> None:
         path = self.directory / "journal.jsonl"
         real_write = os.write
-        with patch("reona._data.os.write", side_effect=lambda fd, data: real_write(fd, data[:3])):
+        with patch("reoengine._data.os.write", side_effect=lambda fd, data: real_write(fd, data[:3])):
             self.assertFalse(append_line(path, {"synthetic": "кириллица"}))
         original = path.read_bytes()
-        with patch("reona._data.os.write", return_value=0):
+        with patch("reoengine._data.os.write", return_value=0):
             with self.assertRaisesRegex(OSError, "no progress"):
                 append_line(path, {"synthetic": "next"})
         self.assertEqual(path.read_bytes(), original)
@@ -715,7 +715,7 @@ class StateAndLogTests(TemporaryTest):
         path = self.directory / "journal.jsonl"
         original = encode({"complete": 1}) + b'{"unfinished":'
         path.write_bytes(original)
-        with patch("reona._data.os.write", side_effect=OSError("synthetic archive failure")):
+        with patch("reoengine._data.os.write", side_effect=OSError("synthetic archive failure")):
             with self.assertRaisesRegex(OSError, "synthetic archive failure"):
                 append_line(path, {"complete": 2})
         self.assertEqual(path.read_bytes(), original)

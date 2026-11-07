@@ -10,11 +10,11 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_project, make_repository
-from reona._data import loads, object_value, read_lines
-from reona.adapters.base import AgentResult
-from reona.config import Limits, RoleConfig
-from reona.fsm import Pipeline, RunInputs
-from reona.state import Status
+from reoengine._data import loads, object_value, read_lines
+from reoengine.adapters.base import AgentResult
+from reoengine.config import Limits, RoleConfig
+from reoengine.fsm import Pipeline, RunInputs
+from reoengine.state import Status
 
 
 class FixAdapter(FakeAdapter):

@@ -12,13 +12,13 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_project, make_repository
-from reona._data import atomic_write, loads, object_value, read_lines
-from reona.config import Configuration, Effort, Engine, Limits, Profile, RoleConfig
-from reona.events import EventKind
-from reona.fsm import Pipeline, RunInputs, StageError
-from reona.preflight import metrics, preflight
-from reona.state import Stage, Status
-from reona.usage import TaskOutcome, TaskOutcomeLog, TokenUsage, UsageRecord
+from reoengine._data import atomic_write, loads, object_value, read_lines
+from reoengine.config import Configuration, Effort, Engine, Limits, Profile, RoleConfig
+from reoengine.events import EventKind
+from reoengine.fsm import Pipeline, RunInputs, StageError
+from reoengine.preflight import metrics, preflight
+from reoengine.state import Stage, Status
+from reoengine.usage import TaskOutcome, TaskOutcomeLog, TokenUsage, UsageRecord
 
 
 class AcceptanceAccountingTests(unittest.TestCase):

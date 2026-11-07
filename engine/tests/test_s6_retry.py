@@ -14,18 +14,18 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_project, make_repository
-from reona._data import Json, atomic_write
-from reona.cli import main
-from reona.config import Configuration, Engine, Limits, Profile, RoleConfig
-from reona.fsm import (
+from reoengine._data import Json, atomic_write
+from reoengine.cli import main
+from reoengine.config import Configuration, Engine, Limits, Profile, RoleConfig
+from reoengine.fsm import (
     Pipeline,
     StageError,
     TransientStageError,
     is_transient_failure,
 )
-from reona.gitops import tree_hash
-from reona.slots import WriterLockTimeout
-from reona.state import RunState, Stage, Status
+from reoengine.gitops import tree_hash
+from reoengine.slots import WriterLockTimeout
+from reoengine.state import RunState, Stage, Status
 
 
 class S6RetryTests(unittest.TestCase):
@@ -232,7 +232,7 @@ class S6RetryTests(unittest.TestCase):
         out, err = io.StringIO(), io.StringIO()
 
         with patch.object(Pipeline, "resume", return_value=fake_state) as mock_resume:
-            with patch("reona.cli.codex_rate_limits", side_effect=AssertionError("No real probes")):
+            with patch("reoengine.cli.codex_rate_limits", side_effect=AssertionError("No real probes")):
                 code = main(["resume", "test-run", "--retry-failed"],
                             root=self.root, adapters={Engine.CODEX: FakeAdapter()},
                             out=out, err=err)

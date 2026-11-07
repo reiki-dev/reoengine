@@ -16,23 +16,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_repository
-from reona._data import atomic_write, loads, object_value, read_lines
-from reona.adapters.base import AgentResult
-from reona.adapters.codex import CodexAdapter
-from reona.cli import main
-from reona.config import (Configuration, Effort, Engine, Limits, Profile, RoleConfig,
+from reoengine._data import atomic_write, loads, object_value, read_lines
+from reoengine.adapters.base import AgentResult
+from reoengine.adapters.codex import CodexAdapter
+from reoengine.cli import main
+from reoengine.config import (Configuration, Effort, Engine, Limits, Profile, RoleConfig,
                           apply_runtime_tuning, load_configuration)
-from reona.doctor import diagnose
-from reona.events import LimitRemaining
-from reona.factory import make_adapters
-from reona.fsm import Pipeline
-from reona.gc import collect_failures
-from reona.jsonout import extract_json
-from reona.gitops import Git
-from reona.preflight import metrics, preflight
-from reona.procs import ProcessResult
-from reona.state import RunState, Stage, Status, load_state, save_state
-from reona.usage import TaskOutcome, TaskOutcomeLog, TokenUsage, UsageLog, UsageRecord
+from reoengine.doctor import diagnose
+from reoengine.events import LimitRemaining
+from reoengine.factory import make_adapters
+from reoengine.fsm import Pipeline
+from reoengine.gc import collect_failures
+from reoengine.jsonout import extract_json
+from reoengine.gitops import Git
+from reoengine.preflight import metrics, preflight
+from reoengine.procs import ProcessResult
+from reoengine.state import RunState, Stage, Status, load_state, save_state
+from reoengine.usage import TaskOutcome, TaskOutcomeLog, TokenUsage, UsageLog, UsageRecord
 
 ENGINE = Path(__file__).resolve().parents[1]
 NOW = datetime(2026, 10, 29, 12, tzinfo=timezone.utc)
@@ -73,7 +73,7 @@ class DigestAdapter(FakeAdapter):
         result = super().invoke(role_cfg, prompt_file, cwd, timeout, schema)
         if role_cfg.model.startswith("reader"):
             self.reads += 1
-            assert schema == ENGINE / "reona/_resources/schemas/review-digest.json"
+            assert schema == ENGINE / "reoengine/_resources/schemas/review-digest.json"
             assert result.final_message_path is not None
             path = result.final_message_path
             if self.reads <= self.failures:
@@ -129,7 +129,7 @@ class CLITests(TemporaryTest):
     def cli(self, args: list[str], **kwargs: object) -> int:
         # kwargs are only used for the two explicitly supported injectable values.
         limit = kwargs.get("limit")
-        with patch("reona.cli.codex_rate_limits", side_effect=AssertionError("No real agent probes")):
+        with patch("reoengine.cli.codex_rate_limits", side_effect=AssertionError("No real agent probes")):
             return main(args, root=self.root, adapters={Engine.CODEX: self.fake}, out=self.out, err=self.err,
                         rate_limits=(lambda: limit) if isinstance(limit, LimitRemaining) else None)
 
@@ -255,7 +255,7 @@ class CLITests(TemporaryTest):
         self.assertEqual(len(reader_calls), 2)
         self.assertIn("The previous response failed validation:", reader_calls[1].prompt)
         self.assertIn("review-digest schema validation failed", reader_calls[1].prompt)
-        contract = (ENGINE / "reona/_resources/gemini-format.txt").read_text(encoding="utf-8")
+        contract = (ENGINE / "reoengine/_resources/gemini-format.txt").read_text(encoding="utf-8")
         self.assertTrue(all(call.prompt.endswith(contract) for call in reader_calls))
         events = [object_value(value, "event") for value in read_lines(self.run_directory() / "events.jsonl")]
         attempts = [event for event in events if event["event"] == "response_validated"]
@@ -292,8 +292,8 @@ class CLITests(TemporaryTest):
         self.assertFalse((directory / "error.json").exists())
 
     def test_environment_and_injected_directories_from_other_cwd(self) -> None:
-        with patch.dict(os.environ, {"REONA_CONFIG_DIR": str(self.config), "REONA_STATE_DIR": str(self.root / "s"),
-                                     "REONA_RUNS_DIR": str(self.root / "r")}):
+        with patch.dict(os.environ, {"REOENGINE_CONFIG_DIR": str(self.config), "REOENGINE_STATE_DIR": str(self.root / "s"),
+                                     "REOENGINE_RUNS_DIR": str(self.root / "r")}):
             self.assertEqual(main(["preflight", "--summary"], out=self.out, err=self.err), 0)
         self.assertIn("no changes; insufficient data", self.out.getvalue())
         self.assertFalse((self.root / "s/tuning.json").exists())
@@ -558,7 +558,7 @@ class MaintenanceTests(TemporaryTest):
         out = io.StringIO()
         # The synthetic neutral folder is under this checkout, which has project
         # instructions. Isolate only that environment check in the healthy case.
-        with patch("reona.doctor._validate_neutral_directory"):
+        with patch("reoengine.doctor._validate_neutral_directory"):
             code = main(["doctor"], root=self.root, home=self.root / "home", neutral_directory=self.root / "neutral",
                         doctor_probe=probe, out=out)
         self.assertEqual(code, 0, out.getvalue())
@@ -579,7 +579,7 @@ class MaintenanceTests(TemporaryTest):
         self.assertTrue(any(item.name == "neutral" and item.level == "error" for item in diagnostics))
 
     def test_factory_includes_fallback_engines_and_neutral_rejects_project(self) -> None:
-        from reona.config import Fallback, Project
+        from reoengine.config import Fallback, Project
         roles = {"architect": RoleConfig(Engine.AGY, "claude-opus", fallback=("gpt-worker",),
                  fallback_chain=(Fallback(Engine.CLAUDE, "opus", True),))}
         config = Configuration(roles, Limits(), {}, {})

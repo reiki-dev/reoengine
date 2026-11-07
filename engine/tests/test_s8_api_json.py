@@ -7,10 +7,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from reona.adapters.api_json import ApiJsonAdapter
-from reona.adapters.base import ErrorKind
-from reona.config import Engine, Effort, RoleConfig, load_roles
-from reona.usage import TokenUsage
+from reoengine.adapters.api_json import ApiJsonAdapter
+from reoengine.adapters.base import ErrorKind
+from reoengine.config import Engine, Effort, RoleConfig, load_roles
+from reoengine.usage import TokenUsage
 from tests.fakes.http_server import ScriptedHttpServer
 
 

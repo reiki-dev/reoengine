@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from reona.gates import GateCheck, GateReport, sanitize_output
+from reoengine.gates import GateCheck, GateReport, sanitize_output
 
 
 class S7SanitizerTests(unittest.TestCase):

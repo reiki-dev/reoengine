@@ -13,18 +13,18 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / 'tests/fakes'))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_repository
-from reona import gates
-from reona._data import Json, atomic_write, loads, object_value, read_lines
-from reona.adapters.agy import AgyAdapter
-from reona.adapters.base import AgentResult, ErrorKind
-from reona.config import Engine, Limits, RoleConfig, Sandbox, load_project
-from reona.fsm import Pipeline, RunInputs, StageError, _review_approved
-from reona.gates import GateCheck, GateRequest, plant_canary, run_gates
-from reona.gitops import Git
-from reona.procs import ProcessResult
-from reona.schemas import SchemaError, validate, validate_artifact
-from reona.state import Stage, Status
-from reona.usage import TokenUsage
+from reoengine import gates
+from reoengine._data import Json, atomic_write, loads, object_value, read_lines
+from reoengine.adapters.agy import AgyAdapter
+from reoengine.adapters.base import AgentResult, ErrorKind
+from reoengine.config import Engine, Limits, RoleConfig, Sandbox, load_project
+from reoengine.fsm import Pipeline, RunInputs, StageError, _review_approved
+from reoengine.gates import GateCheck, GateRequest, plant_canary, run_gates
+from reoengine.gitops import Git
+from reoengine.procs import ProcessResult
+from reoengine.schemas import SchemaError, validate, validate_artifact
+from reoengine.state import Stage, Status
+from reoengine.usage import TokenUsage
 
 
 class ConflictingReviewAdapter(FakeAdapter):
@@ -56,7 +56,7 @@ class S6AgySecurityTests(unittest.TestCase):
     def assert_safe_command_or_refusal(self, role: str, sandbox: Sandbox) -> None:
         config = RoleConfig(Engine.AGY, role, sandbox=sandbox)
         result = AgentResult(0, '', TokenUsage(), 0, None)
-        with patch('reona.adapters.agy.invoke_json', return_value=result) as invoke:
+        with patch('reoengine.adapters.agy.invoke_json', return_value=result) as invoke:
             AgyAdapter(command=('synthetic-agy',), capabilities=('--sandbox', '--mode')).invoke(
                 config, self.prompt, self.directory, 1)
         invoke.assert_called_once()
@@ -148,8 +148,8 @@ class S6AgySecurityTests(unittest.TestCase):
         self.assertEqual((self.directory / 'probes.txt').read_text().splitlines(), ['probe', 'probe'])
 
     def test_agy_probe_timeout_refuses_before_prompt_process(self) -> None:
-        with patch('reona.adapters.agy.run_process', return_value=ProcessResult(-1, '', '', 0, True)) as probe, \
-                patch('reona.adapters.agy.invoke_json') as invoke:
+        with patch('reoengine.adapters.agy.run_process', return_value=ProcessResult(-1, '', '', 0, True)) as probe, \
+                patch('reoengine.adapters.agy.invoke_json') as invoke:
             with self.assertRaisesRegex(RuntimeError, 'Could not verify'):
                 AgyAdapter(('synthetic-agy',)).invoke(
                     RoleConfig(Engine.AGY, 'synthetic'), self.prompt, self.directory, 30)
@@ -160,8 +160,8 @@ class S6AgySecurityTests(unittest.TestCase):
 
     def test_agy_unknown_sandbox_refuses_before_any_process(self) -> None:
         role = replace(RoleConfig(Engine.AGY, 'synthetic'), sandbox='unknown')
-        with patch('reona.adapters.agy.run_process') as probe, \
-                patch('reona.adapters.agy.invoke_json') as invoke:
+        with patch('reoengine.adapters.agy.run_process') as probe, \
+                patch('reoengine.adapters.agy.invoke_json') as invoke:
             with self.assertRaisesRegex(ValueError, 'sandbox'):
                 AgyAdapter(('synthetic-agy',)).invoke(role, self.prompt, self.directory, 5)
         probe.assert_not_called()
@@ -195,7 +195,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
         pipeline = self.pipeline(fake)
         # A successful mock lets an unsafe implementation reach its normal result
         # without executing either trusted checks or the injected argv.
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
             try:
                 state = pipeline.start(inputs)
             except ValueError:
@@ -220,7 +220,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
         pipeline = self.pipeline(FakeAdapter())
         command = ('synthetic-trusted-runner', '--target', 'synthetic')
         pipeline.project = replace(pipeline.project, acceptance={'unit-tests': command})
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
             state = pipeline.start(make_inputs(tdd=False))
         self.assertEqual(state.status, Status.AWAITING_HUMAN)
         self.assertEqual([tuple(call.args[0]) for call in process.call_args_list], [command])
@@ -238,7 +238,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
             with self.subTest(enabled=enabled):
                 fake = FakeAdapter()
                 pipeline = self.pipeline(fake, name=str(enabled), allow_legacy_argv_checks=enabled)
-                with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
+                with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
                     state = pipeline.start(inputs)
                 if enabled:
                     self.assertEqual(state.status, Status.AWAITING_HUMAN)
@@ -267,7 +267,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
                     inputs = replace(inputs, task=changed) if field == 'task' else replace(inputs, plan=changed)
                     fake = FakeAdapter()
                     pipeline = self.pipeline(fake, name=f'{field}-{index}')
-                    with patch('reona.gates.run_process') as process:
+                    with patch('reoengine.gates.run_process') as process:
                         try:
                             state = pipeline.start(inputs)
                         except ValueError:
@@ -286,7 +286,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
                 pipeline = self.pipeline(FakeAdapter(), name=f'generated-{index}')
                 plan = {**inputs.plan, 'acceptance_checks': checks}
                 with patch.object(pipeline, '_invoke', return_value=plan) as invoke, \
-                        patch('reona.gates.run_process') as process:
+                        patch('reoengine.gates.run_process') as process:
                     state = pipeline.start(replace(inputs, plan=None))
                 self.assertEqual((state.stage, state.status), (Stage.PLAN, Status.FAILED))
                 self.assertEqual([call.args[0] for call in invoke.call_args_list], ['architect'])
@@ -314,13 +314,13 @@ class S6PipelineSecurityTests(unittest.TestCase):
         self.pause_after_plan(self.pipeline(FakeAdapter(), allow_legacy_argv_checks=True), inputs)
         fake = FakeAdapter()
         refused = self.pipeline(fake)
-        with patch('reona.gates.run_process') as process, \
+        with patch('reoengine.gates.run_process') as process, \
                 self.assertRaisesRegex(StageError, 'legacy argv checks disabled.*--allow-legacy-argv-checks'):
             refused.resume()
         process.assert_not_called()
         self.assertEqual(fake.calls, [])
         resumed = self.pipeline(fake, allow_legacy_argv_checks=True)
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
             state = resumed.resume()
         self.assertEqual(state.status, Status.AWAITING_HUMAN)
         self.assertEqual(tuple(process.call_args.args[0]), ('synthetic-legacy-runner',))
@@ -335,7 +335,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
         pipeline = self.pipeline(FakeAdapter(), allow_legacy_argv_checks=True)
         self.pause_after_plan(pipeline, inputs)
         resumed = self.pipeline(FakeAdapter(), allow_legacy_argv_checks=True)
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)):
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)):
             state = resumed.resume()
         self.assertEqual(state.status, Status.AWAITING_HUMAN)
         events = [event for event in read_lines(resumed.events.path)
@@ -355,7 +355,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
         resumed = self.pipeline(FakeAdapter())
         command = ('synthetic-current-runner',)
         resumed.project = replace(resumed.project, acceptance={'unit-tests': command})
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
             state = resumed.resume()
         self.assertEqual(state.status, Status.AWAITING_HUMAN)
         self.assertEqual([tuple(call.args[0]) for call in process.call_args_list], [command])
@@ -369,7 +369,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
             self.pause_after_plan(pipeline, replace(inputs, plan=None))
         fake = FakeAdapter()
         refused = self.pipeline(fake)
-        with patch('reona.gates.run_process') as process, \
+        with patch('reoengine.gates.run_process') as process, \
                 self.assertRaisesRegex(StageError, 'plan.acceptance_checks: legacy argv checks disabled'):
             refused.resume()
         process.assert_not_called()
@@ -380,7 +380,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
         pipeline = self.pipeline(fake)
         pipeline.project = replace(pipeline.project, checks=(('synthetic-project-runner',),))
         inputs = make_inputs()
-        with patch('reona.gates.run_process') as process:
+        with patch('reoengine.gates.run_process') as process:
             state = pipeline.start(replace(inputs, task={**inputs.task, 'acceptance_checks': []}))
         self.assertEqual((state.stage, state.status), (Stage.PREFLIGHT, Status.FAILED))
         self.assertEqual(fake.calls, [])
@@ -410,7 +410,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
                 pipeline.project = replace(pipeline.project, allowed_paths=parents)
                 inputs = make_inputs(tdd=False)
                 inputs = replace(inputs, task={**inputs.task, 'allowed_paths': [path]})
-                with patch('reona.gates.run_process') as process:
+                with patch('reoengine.gates.run_process') as process:
                     state = pipeline.start(inputs)
                 self.assertEqual((state.stage, state.status), (Stage.PREFLIGHT, Status.FAILED))
                 self.assertEqual(fake.calls, [])
@@ -423,7 +423,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
         inputs = make_inputs(tdd=False)
         inputs = replace(inputs, task={**inputs.task,
                                       'allowed_paths': ['src/**', 'tests/**', 'outside/**']})
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
             try:
                 state = pipeline.start(inputs)
             except ValueError:
@@ -442,7 +442,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
                 assert inputs.plan is not None
                 inputs = replace(inputs, task={**inputs.task, 'allowed_paths': ['src/**']},
                                  plan={**inputs.plan, 'allowed_paths': paths}, research=True)
-                with patch('reona.gates.run_process') as process:
+                with patch('reoengine.gates.run_process') as process:
                     state = pipeline.start(inputs)
                 self.assertEqual(fake.calls, [])
                 process.assert_not_called()
@@ -460,7 +460,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
         plan = json.loads(path.read_text(encoding='utf-8'))
         plan['allowed_paths'] = ['outside/**']
         atomic_write(path, plan)
-        with patch('reona.gates.run_process') as process, \
+        with patch('reoengine.gates.run_process') as process, \
                 self.assertRaisesRegex(StageError, 'Plan must use a nonempty subset of task allowed_paths'):
             resumed.resume()
         self.assertEqual(fake.calls, [])
@@ -477,7 +477,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
                 self.pause_after_plan(pipeline, inputs)
                 self.assertIn('researcher', [call.model for call in fake.calls])
                 resumed = self.pipeline(FakeAdapter(), name=name)
-                with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
+                with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)) as process:
                     state = resumed.resume()
                 self.assertEqual(state.status, Status.AWAITING_HUMAN)
                 process.assert_called_once()
@@ -485,7 +485,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
     def assert_conflicting_review_rejected(self, severity: str) -> None:
         fake = ConflictingReviewAdapter(severity)
         pipeline = self.pipeline(fake)
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)):
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)):
             state = pipeline.start(make_inputs(tdd=False))
         self.assertIn('reviewer', [call.model for call in fake.calls])
         review = json.loads((pipeline.directory / 'prompts' / 'fake-3.json').read_text(encoding='utf-8'))
@@ -506,7 +506,7 @@ class S6PipelineSecurityTests(unittest.TestCase):
 
     def test_review_approved_with_medium_finding_can_reach_accept(self) -> None:
         pipeline = self.pipeline(ConflictingReviewAdapter('medium'))
-        with patch('reona.gates.run_process', return_value=ProcessResult(0, '', '', 0)):
+        with patch('reoengine.gates.run_process', return_value=ProcessResult(0, '', '', 0)):
             state = pipeline.start(make_inputs(tdd=False))
         self.assertEqual((state.stage, state.status), (Stage.ACCEPT, Status.AWAITING_HUMAN))
 
@@ -663,8 +663,8 @@ class S6TddSecurityTests(unittest.TestCase):
                 return GateCheck(name, False, exit_code, stdout, stderr)
             return GateCheck(name, True)
 
-        with patch('reona.gates._execute', side_effect=execute) as execution, \
-                patch('reona.gates.run_process') as process:
+        with patch('reoengine.gates._execute', side_effect=execute) as execution, \
+                patch('reoengine.gates.run_process') as process:
             report = run_gates(self.git, request, self.directory / 'gates.json')
         process.assert_not_called()
         self.assertEqual([call.args[0] for call in execution.call_args_list],
@@ -764,7 +764,7 @@ class S6TddSecurityTests(unittest.TestCase):
                                (ProcessResult(2, '', '', 0), False),
                                (ProcessResult(-1, '', '', 0), False),
                                (ProcessResult(0, '', '', 0, True), False)):
-            with self.subTest(result=result), patch('reona.gates.run_process', return_value=result):
+            with self.subTest(result=result), patch('reoengine.gates.run_process', return_value=result):
                 self.assertEqual(gates._execute('tdd_green:0', ('synthetic',), self.repo, request).passed, passed)
 
 

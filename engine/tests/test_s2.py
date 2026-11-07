@@ -19,23 +19,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "fakes"))
 
 from pipeline import FakeAdapter, SlotProbeAdapter, git_command, make_inputs, make_pipeline, make_repository
-from reona._data import Json, atomic_write, loads, object_value, read_lines
-from reona.adapters.base import AgentResult
-from reona.config import Engine, Limits, Profile, RoleConfig
-from reona.fsm import InvalidDigest, Pipeline, RunInputs, StageError
-from reona.gates import (GateCheck, GateReport, GateRequest, offline_environment, plant_canary,
+from reoengine._data import Json, atomic_write, loads, object_value, read_lines
+from reoengine.adapters.base import AgentResult
+from reoengine.config import Engine, Limits, Profile, RoleConfig
+from reoengine.fsm import InvalidDigest, Pipeline, RunInputs, StageError
+from reoengine.gates import (GateCheck, GateReport, GateRequest, offline_environment, plant_canary,
                          run_gates, sanitize_output, validate_paths)
-from reona.gitops import CANARY_MARKER, CANARY_PATH, SECRET_PATTERNS, Change, Diff, Git, SafetyError, ensure_safe_tree, secret_path, tree_hash
-from reona.prompt import PROHIBITIONS, build_prompt
-from reona.schemas import validate_artifact
-from reona.skills import Skill, select_skills
-from reona.slots import Slots
-from reona.state import RunLock, RunLockedError, Stage, Status, load_state, save_state
+from reoengine.gitops import CANARY_MARKER, CANARY_PATH, SECRET_PATTERNS, Change, Diff, Git, SafetyError, ensure_safe_tree, secret_path, tree_hash
+from reoengine.prompt import PROHIBITIONS, build_prompt
+from reoengine.schemas import validate_artifact
+from reoengine.skills import Skill, select_skills
+from reoengine.slots import Slots
+from reoengine.state import RunLock, RunLockedError, Stage, Status, load_state, save_state
 
 
 class RepositoryTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="reona-s2-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="reoengine-s2-")
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
         self.root = make_repository(self.directory)
@@ -529,7 +529,7 @@ class PipelineTests(RepositoryTest):
     def test_writer_lock_timeout_is_stage_error_and_failed_run(self) -> None:
         fake = FakeAdapter()
         pipeline = make_pipeline(self.directory, self.root, fake)
-        with patch("reona.slots.file_lock", side_effect=TimeoutError("synthetic contention")):
+        with patch("reoengine.slots.file_lock", side_effect=TimeoutError("synthetic contention")):
             self.assertEqual(pipeline.start(make_inputs()).status, Status.FAILED)
             error = (pipeline.directory / "error.json").read_text(encoding="utf-8")
             self.assertIn("writer.lock", error)
@@ -999,10 +999,10 @@ class RunLockTests(unittest.TestCase):
                 contender.acquire()
                 acquired.set()
 
-            with patch("reona._data.file_lock", side_effect=fake_guard), \
-                    patch("reona.state.os.open", side_effect=record_open), \
+            with patch("reoengine._data.file_lock", side_effect=fake_guard), \
+                    patch("reoengine.state.os.open", side_effect=record_open), \
                     patch.object(Path, "read_text", new=paused_read), \
-                    patch("reona.state.pid_alive", return_value=False), \
+                    patch("reoengine.state.pid_alive", return_value=False), \
                     ThreadPoolExecutor(max_workers=2) as pool:
                 def release() -> None:
                     threading.current_thread().name = "release"

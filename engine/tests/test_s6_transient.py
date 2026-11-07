@@ -13,8 +13,8 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_project, make_repository
-from reona.config import Configuration, Engine, Limits, Profile, RoleConfig
-from reona.fsm import (
+from reoengine.config import Configuration, Engine, Limits, Profile, RoleConfig
+from reoengine.fsm import (
     InvalidDigest,
     LimitExhausted,
     OutsideWrite,
@@ -22,9 +22,9 @@ from reona.fsm import (
     StageError,
     is_transient_failure,
 )
-from reona.gitops import SafetyError
-from reona.slots import WriterLockTimeout
-from reona.state import Status
+from reoengine.gitops import SafetyError
+from reoengine.slots import WriterLockTimeout
+from reoengine.state import Status
 
 
 class CustomOutsideWrite(OutsideWrite):

@@ -19,7 +19,7 @@ from .gitops import (CANARY_MARKER, CANARY_PATH, CANARY_TEXT, SECRET_PATTERNS, D
 from .procs import ProcessResult, run_process
 from .schemas import validate_artifact
 
-BLOCKED_PATHS = ("AGENTS.md", "CLAUDE.md", "CLAUDE.local.md", "REONA.md", "PERSONA.md",
+BLOCKED_PATHS = ("AGENTS.md", "CLAUDE.md", "CLAUDE.local.md", "REOENGINE.md", "PERSONA.md",
                  "config/**", ".github/**", ".gitlab/**", ".gitlab-ci*", "azure-pipelines*",
                  "Jenkinsfile", ".circleci/**", ".claude/**", ".git/**", CANARY_PATH)
 ENV_ALLOW = frozenset({"PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP",

@@ -123,7 +123,7 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
         self.source = Git(project.repo, exclude_from_worktree=project.exclude_from_worktree)
         default_config = Path(__file__).resolve().parents[2] / "config"
         self.config_directory = (config_directory if config_directory is not None else
-                                 Path(os.environ.get("REONA_CONFIG_DIR", str(default_config)))).resolve()
+                                 Path(os.environ.get("REOENGINE_CONFIG_DIR", str(default_config)))).resolve()
         self.guard = OutsideGuard(self.directory, self.config_directory, self.state_directory, self.source)
         for path in (self.directory, self.state_directory):
             if path.is_relative_to(self.source.root):
@@ -630,7 +630,7 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
                 raise LimitExhausted("Codex limit exhausted")
             with self.slots.acquire(role, self.state.run_id, writing=role == "coder"):
                 if neutral or candidate.neutral_cwd:
-                    with tempfile.TemporaryDirectory(prefix="reona-neutral-") as directory:
+                    with tempfile.TemporaryDirectory(prefix="reoengine-neutral-") as directory:
                         cwd = Path(directory)
                         _validate_neutral_directory(cwd)
                         if any((parent / ".git").exists() for parent in cwd.parents):

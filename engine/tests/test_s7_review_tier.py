@@ -13,10 +13,10 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_repository
-from reona._data import Json, atomic_write, loads, object_value
-from reona.config import Limits
-from reona.fsm import StageError
-from reona.gates import risk_tier
+from reoengine._data import Json, atomic_write, loads, object_value
+from reoengine.config import Limits
+from reoengine.fsm import StageError
+from reoengine.gates import risk_tier
 
 
 class ReviewTierAdapter(FakeAdapter):
@@ -99,7 +99,7 @@ class ReviewTierTests(unittest.TestCase):
         adapter = ReviewTierAdapter(changed_lines=401, inflate_digest=True)
         pipeline = make_pipeline(self.root, self.repo, adapter, limits=Limits(max_fix_rounds=0))
         pipeline.project = replace(pipeline.project, high_risk_paths=("src/**",))
-        original = __import__("reona.fsm", fromlist=["build_prompt"]).build_prompt
+        original = __import__("reoengine.fsm", fromlist=["build_prompt"]).build_prompt
 
         def reject_full_diff(*args, **kwargs):
             if kwargs.get("json_contract") and not kwargs.get("read_only_full_diff"):
@@ -110,7 +110,7 @@ class ReviewTierTests(unittest.TestCase):
                 return prompt
             return original(*args, **kwargs)
 
-        with patch("reona.fsm.build_prompt", side_effect=reject_full_diff):
+        with patch("reoengine.fsm.build_prompt", side_effect=reject_full_diff):
             pipeline.start(make_inputs())
         error = object_value(loads((pipeline.directory / "error.json").read_text()), "error")
         self.assertEqual(error["error"], "review_input_too_large")

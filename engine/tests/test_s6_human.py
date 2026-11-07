@@ -14,15 +14,15 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, git_command, make_inputs, make_pipeline, make_project, make_repository
-from reona._data import Json, atomic_write, loads, object_value, read_lines
-from reona.adapters.base import AgentResult
-from reona.cli import main
-from reona.config import Configuration, Engine, Limits, RoleConfig
+from reoengine._data import Json, atomic_write, loads, object_value, read_lines
+from reoengine.adapters.base import AgentResult
+from reoengine.cli import main
+from reoengine.config import Configuration, Engine, Limits, RoleConfig
 from dataclasses import replace
-from reona.events import EventKind, sha256_file
-from reona.fsm import Pipeline, RunInputs, StageError
-from reona.schemas import validate_artifact
-from reona.state import RunState, Stage, Status, load_state, save_state
+from reoengine.events import EventKind, sha256_file
+from reoengine.fsm import Pipeline, RunInputs, StageError
+from reoengine.schemas import validate_artifact
+from reoengine.state import RunState, Stage, Status, load_state, save_state
 
 
 class HumanApprovalTests(unittest.TestCase):
@@ -405,7 +405,7 @@ class HumanCliTests(unittest.TestCase):
         self.fake = FakeAdapter()
 
     def cli(self, args: list[str]) -> int:
-        with patch("reona.cli.codex_rate_limits", side_effect=AssertionError("No real agent probes")):
+        with patch("reoengine.cli.codex_rate_limits", side_effect=AssertionError("No real agent probes")):
             return main(args, root=self.root, adapters={Engine.CODEX: self.fake}, out=self.out, err=self.err)
 
     def run_task(self) -> int:

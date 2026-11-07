@@ -12,14 +12,14 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_repository
-from reona._data import loads
-from reona.config import Configuration, Effort, Engine, Limits, RoleConfig, apply_runtime_tuning
-from reona.events import LimitRemaining
-from reona.fsm import Status
-from reona.gc import usage_size_warnings
-from reona.preflight import metrics, preflight
-from reona.state import Stage
-from reona.usage import TaskOutcome, TaskOutcomeLog, TokenUsage, UsageLog, UsageRecord
+from reoengine._data import loads
+from reoengine.config import Configuration, Effort, Engine, Limits, RoleConfig, apply_runtime_tuning
+from reoengine.events import LimitRemaining
+from reoengine.fsm import Status
+from reoengine.gc import usage_size_warnings
+from reoengine.preflight import metrics, preflight
+from reoengine.state import Stage
+from reoengine.usage import TaskOutcome, TaskOutcomeLog, TokenUsage, UsageLog, UsageRecord
 
 NOW = datetime(2026, 11, 1, 12, tzinfo=timezone.utc)
 

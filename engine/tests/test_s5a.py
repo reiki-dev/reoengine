@@ -14,13 +14,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "fakes"))
 
 from pipeline import FakeAdapter, git_command, make_inputs, make_pipeline, make_repository
-from reona._data import loads, object_value, read_lines
-from reona.config import Limits, Project, load_project
-from reona.fsm import Pipeline, StageError
-from reona.gates import GateRequest, plant_canary, run_gates
-from reona.gitops import Git, SafetyError, ensure_safe_tree, secret_path, tree_hash
-from reona.guard import OutsideGuard
-from reona.state import Status
+from reoengine._data import loads, object_value, read_lines
+from reoengine.config import Limits, Project, load_project
+from reoengine.fsm import Pipeline, StageError
+from reoengine.gates import GateRequest, plant_canary, run_gates
+from reoengine.gitops import Git, SafetyError, ensure_safe_tree, secret_path, tree_hash
+from reoengine.guard import OutsideGuard
+from reoengine.state import Status
 
 
 class SecretPatternsTests(unittest.TestCase):
@@ -167,7 +167,7 @@ class WorktreeExclusionTests(unittest.TestCase):
             self.directory / "work", self.git.head())
         self.assertFalse((other.root / "unchanged.txt").exists())
         self.assertEqual(other.diff(self.git.head()).patch, b"")
-        with patch("reona.gitops.tree_entries", return_value=iter((("unchanged.txt", other.root / "unchanged.txt"),))):
+        with patch("reoengine.gitops.tree_entries", return_value=iter((("unchanged.txt", other.root / "unchanged.txt"),))):
             with self.assertRaisesRegex(SafetyError, "Excluded path"):
                 ensure_safe_tree(other.root, other.exclude_from_worktree)
         self.assertEqual(self.git.command(("config", "--get", "core.ignoreCase")).strip(), b"true")
@@ -178,7 +178,7 @@ class WorktreeExclusionTests(unittest.TestCase):
                                      ("docs/Шаблон письма.example", "DOCS/ШАБЛОН ПИСЬМА.EXAMPLE"),
                                      ("docs/caf\u00e9.txt", "docs/CAFE\u0301.TXT")):
             with self.subTest(configured=configured), self.no_excluded_reads((configured,)), \
-                    patch("reona.gitops.tree_entries", return_value=iter(((appeared, self.repo / appeared),))):
+                    patch("reoengine.gitops.tree_entries", return_value=iter(((appeared, self.repo / appeared),))):
                 with self.assertRaises(SafetyError):
                     ensure_safe_tree(self.repo, (configured,))
 
@@ -343,7 +343,7 @@ class WorktreeExclusionTests(unittest.TestCase):
             fake = FakeAdapter()
             resumed = self.pipeline(fake, exclusions=changed)
             with self.subTest(changed=changed), \
-                    patch("reona.fsm.ensure_safe_tree", side_effect=AssertionError("Must refuse before tree scan")):
+                    patch("reoengine.fsm.ensure_safe_tree", side_effect=AssertionError("Must refuse before tree scan")):
                 with self.assertRaisesRegex(StageError, "exclude_from_worktree configuration changed"):
                     resumed.resume()
             self.assertEqual(fake.calls, [])

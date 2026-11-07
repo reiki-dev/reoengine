@@ -9,10 +9,10 @@ from unittest.mock import patch
 
 from test_s4c import SyntheticTest, WritingAdapter
 from pipeline import FakeAdapter, git_command, make_inputs, make_pipeline
-from reona._data import read_lines
-from reona.gitops import Git
-from reona.guard import OutsideGuard, Snapshot, SnapshotError, source_snapshot
-from reona.state import Status
+from reoengine._data import read_lines
+from reoengine.gitops import Git
+from reoengine.guard import OutsideGuard, Snapshot, SnapshotError, source_snapshot
+from reoengine.state import Status
 
 
 class GitMetadataTests(SyntheticTest):
@@ -33,7 +33,7 @@ class GitMetadataTests(SyntheticTest):
         hook.touch()
         git_command(self.repo, "branch", "synthetic-alias")
         actions: dict[str, Callable[[], object]] = {
-            "config": lambda: git_command(self.repo, "config", "--local", "reona.synthetic", "changed"),
+            "config": lambda: git_command(self.repo, "config", "--local", "reoengine.synthetic", "changed"),
             "existing-hook": lambda: hook.write_text("synthetic replacement", encoding="utf-8"),
             "new-hook": (gitdir / "hooks/synthetic-new").touch,
             "exclude": lambda: self.bump(gitdir / "info/exclude"),
@@ -158,7 +158,7 @@ class GitMetadataTests(SyntheticTest):
         snapshot = guard.snapshot()
         self.assertIn("gitdir:common/config", snapshot.source.paths)
         self.assertIn("gitdir:private/HEAD", snapshot.source.paths)
-        self.assert_change(guard, lambda: guard.source.command(("config", "--local", "reona.synthetic", "changed")))
+        self.assert_change(guard, lambda: guard.source.command(("config", "--local", "reoengine.synthetic", "changed")))
         self.assert_change(guard, lambda: self.bump(personal / "HEAD"))
         for name in ("config.worktree", "info/nested/fixture", "hooks/nested/fixture"):
             path = personal / name
@@ -174,9 +174,9 @@ class GitMetadataTests(SyntheticTest):
         snapshot = source_snapshot(source)
         assert snapshot is not None
         limit = len(snapshot.paths)
-        with patch("reona.guard.MAX_IGNORED_ENTRIES", limit):
+        with patch("reoengine.guard.MAX_IGNORED_ENTRIES", limit):
             self.assertEqual(snapshot, source_snapshot(source))
-        with patch("reona.guard.MAX_IGNORED_ENTRIES", limit - 1):
+        with patch("reoengine.guard.MAX_IGNORED_ENTRIES", limit - 1):
             self.assertIsNone(source_snapshot(source))
         for after in (False, True):
             with self.subTest(after=after):
@@ -184,7 +184,7 @@ class GitMetadataTests(SyntheticTest):
                         if after else FakeAdapter())
                 pipeline = make_pipeline(self.directory / f"limit-{after}", self.repo, fake,
                                          config_directory=self.config)
-                with patch("reona.guard.MAX_IGNORED_ENTRIES", limit if after else limit - 1):
+                with patch("reoengine.guard.MAX_IGNORED_ENTRIES", limit if after else limit - 1):
                     pipeline.start(make_inputs(tdd=False))
                 self.assert_source_snapshot_failure(pipeline, fake, int(after))
 
@@ -218,7 +218,7 @@ class GitMetadataTests(SyntheticTest):
         def incomplete(path: Path) -> object:
             return BrokenScan() if path == gitdir / "hooks" else scandir(path)
 
-        with patch("reona.guard.os.scandir", side_effect=incomplete):
+        with patch("reoengine.guard.os.scandir", side_effect=incomplete):
             with self.assertRaisesRegex(SnapshotError, "^outside_snapshot_unavailable:source_repo$"):
                 guard.snapshot()
 
@@ -243,7 +243,7 @@ class GitMetadataTests(SyntheticTest):
             return scandir(path)
 
         source = self.pipeline().source
-        with patch("reona.guard.os.scandir", side_effect=no_link_scan), \
+        with patch("reoengine.guard.os.scandir", side_effect=no_link_scan), \
                 patch.object(Path, "open", side_effect=AssertionError("source content read")):
             before = source_snapshot(source)
             assert before is not None

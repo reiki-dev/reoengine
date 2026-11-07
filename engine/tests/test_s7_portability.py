@@ -9,10 +9,10 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from reona.adapters.agy import AgyAdapter
-from reona.config import load_project
-from reona.paths import neutral_path
-from reona.procs import _environ_has_process_token, _parse_proc_stat
+from reoengine.adapters.agy import AgyAdapter
+from reoengine.config import load_project
+from reoengine.paths import neutral_path
+from reoengine.procs import _environ_has_process_token, _parse_proc_stat
 
 
 class ProcStatParserTests(unittest.TestCase):
@@ -20,9 +20,9 @@ class ProcStatParserTests(unittest.TestCase):
         self.assertEqual(_parse_proc_stat("123 (worker ) with spaces) S 45 7 8 9"), (123, 45))
 
     def test_process_token_parser_requires_exact_environment_entry(self) -> None:
-        self.assertTrue(_environ_has_process_token(b"A=1\0REONA_PROCESS_TOKEN=abc123\0B=2", "abc123"))
-        self.assertFalse(_environ_has_process_token(b"REONA_PROCESS_TOKEN=abc1234\0", "abc123"))
-        self.assertFalse(_environ_has_process_token(b"PREFIX_REONA_PROCESS_TOKEN=abc123\0", "abc123"))
+        self.assertTrue(_environ_has_process_token(b"A=1\0REOENGINE_PROCESS_TOKEN=abc123\0B=2", "abc123"))
+        self.assertFalse(_environ_has_process_token(b"REOENGINE_PROCESS_TOKEN=abc1234\0", "abc123"))
+        self.assertFalse(_environ_has_process_token(b"PREFIX_REOENGINE_PROCESS_TOKEN=abc123\0", "abc123"))
 
 
 class ConfigurationVariableTests(unittest.TestCase):
@@ -44,11 +44,11 @@ class ConfigurationVariableTests(unittest.TestCase):
         with patch.dict(os.environ, {"PORTABILITY_REPO": str(repo)}), patch("pathlib.Path.home", return_value=home):
             project = self.load('''repo = "\${ENV:PORTABILITY_REPO}"
 profile = "default"
-checks = [["\${HOME}/bin/check", "\${REONA_ROOT}/arg", "$UNTOUCHED"]]
+checks = [["\${HOME}/bin/check", "\${REOENGINE_ROOT}/arg", "$UNTOUCHED"]]
 [links]
 node_modules = "\${ENV:PORTABILITY_REPO}/node_modules"
 [acceptance]
-check = ["\${HOME}/bin/accept", "\${REONA_ROOT}/accept"]
+check = ["\${HOME}/bin/accept", "\${REOENGINE_ROOT}/accept"]
 ''')
         self.assertEqual(project.repo, repo)
         self.assertEqual(project.links["node_modules"], repo / "node_modules")
@@ -79,10 +79,10 @@ class PlatformDefaultTests(unittest.TestCase):
             xdg = base / "xdg"
             override = base / "override"
             cases = (
-                ({"REONA_NEUTRAL_DIR": str(override), "LOCALAPPDATA": str(local), "XDG_STATE_HOME": str(xdg)}, override),
-                ({"LOCALAPPDATA": str(local), "XDG_STATE_HOME": str(xdg)}, local / "reona" / "neutral"),
-                ({"XDG_STATE_HOME": str(xdg)}, xdg / "reona" / "neutral"),
-                ({}, home / ".local" / "state" / "reona" / "neutral"),
+                ({"REOENGINE_NEUTRAL_DIR": str(override), "LOCALAPPDATA": str(local), "XDG_STATE_HOME": str(xdg)}, override),
+                ({"LOCALAPPDATA": str(local), "XDG_STATE_HOME": str(xdg)}, local / "reoengine" / "neutral"),
+                ({"XDG_STATE_HOME": str(xdg)}, xdg / "reoengine" / "neutral"),
+                ({}, home / ".local" / "state" / "reoengine" / "neutral"),
             )
             for environment, expected in cases:
                 with self.subTest(environment=environment), patch.dict(os.environ, environment, clear=True), \
@@ -90,9 +90,9 @@ class PlatformDefaultTests(unittest.TestCase):
                     self.assertEqual(neutral_path(), expected)
 
     def test_agy_default_command_matches_platform(self) -> None:
-        with patch("reona.adapters.agy.os.name", "nt"):
+        with patch("reoengine.adapters.agy.os.name", "nt"):
             self.assertEqual(AgyAdapter().command, ("agy.exe",))
-        with patch("reona.adapters.agy.os.name", "posix"):
+        with patch("reoengine.adapters.agy.os.name", "posix"):
             self.assertEqual(AgyAdapter().command, ("agy",))
 
 

@@ -13,11 +13,11 @@ from unittest.mock import patch
 ENGINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ENGINE))
 
-from reona.adapters.agy import AgyAdapter
-from reona.adapters.base import ErrorKind
-from reona.cli import main
-from reona.config import Engine, RoleConfig
-from reona.usage import TokenUsage
+from reoengine.adapters.agy import AgyAdapter
+from reoengine.adapters.base import ErrorKind
+from reoengine.cli import main
+from reoengine.config import Engine, RoleConfig
+from reoengine.usage import TokenUsage
 
 
 class RecordingStream(io.StringIO):
@@ -41,7 +41,7 @@ class S4bTests(unittest.TestCase):
         self.prompt = self.root / "prompt.txt"
         self.prompt.write_text("synthetic prompt", encoding="utf-8")
         self.schema = self.root / "schema with spaces.json"
-        self.schema.write_bytes((ENGINE / "reona/_resources/schemas/review.json").read_bytes())
+        self.schema.write_bytes((ENGINE / "reoengine/_resources/schemas/review.json").read_bytes())
         self.trace = self.root / "argv.json"
 
     def test_agy_structured_envelope_and_flags(self) -> None:
@@ -101,13 +101,13 @@ class S4bTests(unittest.TestCase):
     def test_cli_module_redirected_output_is_utf8(self) -> None:
         env = {key: value for key, value in os.environ.items()
                if key.upper() not in ("PYTHONIOENCODING", "PYTHONUTF8")}
-        process = subprocess.run([sys.executable, "-m", "reona", *self.gc_args()], cwd=ENGINE,
+        process = subprocess.run([sys.executable, "-m", "reoengine", *self.gc_args()], cwd=ENGINE,
                                  env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
         self.assertEqual(process.returncode, 0, process.stderr.decode("utf-8", errors="replace"))
         self.assertIn("Removed", process.stdout.decode("utf-8"))
 
     def test_cli_repairs_cp1252_streams(self) -> None:
-        script = ("import sys; from reona.cli import main; "
+        script = ("import sys; from reoengine.cli import main; "
                   "sys.stdout.reconfigure(encoding='cp1252'); sys.stderr.reconfigure(encoding='cp1252'); "
                   "raise SystemExit(main())")
         process = subprocess.run([sys.executable, "-c", script, *self.gc_args()], cwd=ENGINE,

@@ -1,7 +1,7 @@
 [project]
 name = "reoengine"
 version = "0.1.0"
-description = "Offline-testable primitives for the Reona engine"
+description = "Offline-testable primitives for ReOEngine"
 requires-python = ">=3.11"
 dependencies = []
 license = { text = "Apache-2.0" }
@@ -10,8 +10,7 @@ license = { text = "Apache-2.0" }
 Repository = "https://github.com/reiki-dev/reoengine"
 
 [project.scripts]
-reoengine = "reona.cli:main"
-reona = "reona.cli:main"
+reoengine = "reoengine.cli:main"
 
 [build-system]
 requires = ["setuptools>=61"]
@@ -19,10 +18,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["reona*"]
+include = ["reoengine*"]
 
 [tool.setuptools.package-data]
-reona = ["_resources/*", "_resources/schemas/*.json"]
+reoengine = ["_resources/*", "_resources/schemas/*.json"]
 
 [tool.mypy]
 strict = true

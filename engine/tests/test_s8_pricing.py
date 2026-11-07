@@ -8,15 +8,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from reona.adapters.api_json import ApiJsonAdapter
-from reona.config import (Effort, Engine, Pricing, RoleConfig, load_pricing,
+from reoengine.adapters.api_json import ApiJsonAdapter
+from reoengine.config import (Effort, Engine, Pricing, RoleConfig, load_pricing,
                           load_roles)
-from reona.doctor import Probe
-from reona.events import LimitRemaining
-from reona.procs import ProcessResult
-from reona.state import Stage
-from reona.usage import TokenUsage, UsageLog, UsageRecord, cost_usd
-from reona.cli import main
+from reoengine.doctor import Probe
+from reoengine.events import LimitRemaining
+from reoengine.procs import ProcessResult
+from reoengine.state import Stage
+from reoengine.usage import TokenUsage, UsageLog, UsageRecord, cost_usd
+from reoengine.cli import main
 from tests.fakes.http_server import ScriptedHttpServer
 
 

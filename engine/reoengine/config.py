@@ -17,7 +17,7 @@ from .runlinks import validate_links
 from .gitops import validate_worktree_exclusions
 
 
-_CONFIG_VARIABLE = re.compile(r"\$\{(REONA_ROOT|HOME|ENV:([A-Za-z_][A-Za-z0-9_]*))\}")
+_CONFIG_VARIABLE = re.compile(r"\$\{(REOENGINE_ROOT|HOME|ENV:([A-Za-z_][A-Za-z0-9_]*))\}")
 
 
 def _expand_config_string(value: str, path: Path) -> str:
@@ -26,7 +26,7 @@ def _expand_config_string(value: str, path: Path) -> str:
 
     def replace(match: re.Match[str]) -> str:
         variable = match.group(1)
-        if variable == "REONA_ROOT":
+        if variable == "REOENGINE_ROOT":
             return str(repo_root)
         if variable == "HOME":
             return str(Path.home())

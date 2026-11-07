@@ -89,12 +89,12 @@ def _ensure_run_links(directory: Path, links: Mapping[str, Path]) -> None:
         if os.path.lexists(link):
             continue
         if os.name == "nt":
-            env = dict(os.environ, REONA_RUN_LINK=str(link), REONA_RUN_TARGET=str(target))
+            env = dict(os.environ, REOENGINE_RUN_LINK=str(link), REOENGINE_RUN_TARGET=str(target))
             # The command is constant: no user text is interpolated into cmd syntax.
             # Quoted env expansion preserves spaces/metacharacters; delayed expansion
             # is disabled, and cmd does not recursively expand % inside env values.
             result = subprocess.run(
-                'cmd.exe /d /v:off /c mklink /J "%REONA_RUN_LINK%" "%REONA_RUN_TARGET%"',
+                'cmd.exe /d /v:off /c mklink /J "%REOENGINE_RUN_LINK%" "%REOENGINE_RUN_TARGET%"',
                 cwd=directory, env=env, shell=False, timeout=30,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             if result.returncode:

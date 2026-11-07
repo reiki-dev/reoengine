@@ -36,11 +36,11 @@ See [known limits](docs/SECURITY_AND_COMPLIANCE.md#6-known-limits-read-before-re
 ```bash
 git clone https://github.com/reiki-dev/reoengine.git
 cd reoengine
-python -m pip install ./engine        # installs the `reoengine` and `reona` commands
+python -m pip install ./engine        # installs the `reoengine` and `reoengine` commands
 reoengine doctor                      # checks git, vendor CLIs and configuration
 ```
 
-Or run in place, without installing: `cd engine && python -m reona doctor`.
+Or run in place, without installing: `cd engine && python -m reoengine doctor`.
 
 You also need `git`, and whichever vendor CLIs you choose to use for roles (`codex`, `claude`,
 `agy`) installed and signed in, or an API key in an environment variable such as `GEMINI_API_KEY`.
@@ -52,7 +52,7 @@ You also need `git`, and whichever vendor CLIs you choose to use for roles (`cod
    environment variable (`${ENV:NAME}` is expanded when the file is loaded), list the allowed
    paths and the check commands as argv arrays.
 2. **Write a task** (`task.json`, validated against
-   `engine/reona/_resources/schemas/task.json`): an id, title, description, numbered
+   `engine/reoengine/_resources/schemas/task.json`): an id, title, description, numbered
    requirements, `allowed_paths`, acceptance check ids, `tdd_gate`, and a profile.
 3. **Run it.**
 
@@ -110,7 +110,7 @@ and anything that serves others. Read [docs/PROVIDER_TERMS.md](docs/PROVIDER_TER
 ```bash
 cd engine
 python -m unittest discover -s tests          # full suite
-python -m mypy --strict reona                 # type check
+python -m mypy --strict reoengine                 # type check
 ```
 
 Tests use fake CLIs and local fake HTTP servers; they need no network, accounts or keys.

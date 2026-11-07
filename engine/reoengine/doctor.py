@@ -81,7 +81,7 @@ def diagnose(config_directory: Path, state_directory: Path, *, home: Path | None
     try:
         state_directory.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryFile(dir=state_directory) as stream:
-            stream.write(b"reona-write-probe")
+            stream.write(b"reoengine-write-probe")
             stream.flush()
         checks.append(Diagnostic("OK", "state", "writable"))
     except OSError:

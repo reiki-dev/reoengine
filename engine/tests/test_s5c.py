@@ -15,14 +15,14 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / 'tests/fakes'))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_repository
-from reona._data import atomic_write, encode, loads, object_value
-from reona.adapters.base import AgentResult
-from reona.config import Limits, RoleConfig, load_limits, load_profile
-from reona.fsm import InvalidDigest, Pipeline
-from reona.gitops import Diff, SECRET_PATTERNS
-from reona.prompt import build_prompt
-from reona.runlinks import is_link, remove_run_links
-from reona.state import Stage, Status
+from reoengine._data import atomic_write, encode, loads, object_value
+from reoengine.adapters.base import AgentResult
+from reoengine.config import Limits, RoleConfig, load_limits, load_profile
+from reoengine.fsm import InvalidDigest, Pipeline
+from reoengine.gitops import Diff, SECRET_PATTERNS
+from reoengine.prompt import build_prompt
+from reoengine.runlinks import is_link, remove_run_links
+from reoengine.state import Stage, Status
 
 
 class DigestAdapter(FakeAdapter):
@@ -156,7 +156,7 @@ class S5cTests(unittest.TestCase):
         target = self.directory / 'dependencies'
         target.mkdir()
         pipeline.project = replace(pipeline.project, links={'node_modules': target})
-        with patch('reona.runlinks._ensure_run_links', side_effect=OSError(str(target))):
+        with patch('reoengine.runlinks._ensure_run_links', side_effect=OSError(str(target))):
             self.assertEqual(pipeline.start(make_inputs(tdd=False)).status, Status.FAILED)
         self.assertEqual(fake.calls, [])
         error = json.loads((pipeline.directory / 'error.json').read_text())
@@ -170,7 +170,7 @@ class S5cTests(unittest.TestCase):
         target = self.directory / 'dependencies'
         target.mkdir()
         pipeline.project = replace(pipeline.project, links={'node_modules': target})
-        with patch('reona.runlinks.subprocess.run') as command:
+        with patch('reoengine.runlinks.subprocess.run') as command:
             command.return_value.returncode = 1
             self.assertEqual(pipeline.start(make_inputs(tdd=False)).status, Status.FAILED)
         self.assertEqual(fake.calls, [])

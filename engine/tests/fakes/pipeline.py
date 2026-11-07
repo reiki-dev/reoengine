@@ -10,11 +10,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from reona._data import Json, atomic_write, loads, object_value
-from reona.adapters.base import AgentResult, ErrorKind
-from reona.config import Configuration, Engine, Limits, Profile, Project, RoleConfig
-from reona.fsm import Pipeline, RunInputs
-from reona.usage import TokenUsage
+from reoengine._data import Json, atomic_write, loads, object_value
+from reoengine.adapters.base import AgentResult, ErrorKind
+from reoengine.config import Configuration, Engine, Limits, Profile, Project, RoleConfig
+from reoengine.fsm import Pipeline, RunInputs
+from reoengine.usage import TokenUsage
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class FakeAdapter:
                schema: Path | None = None) -> AgentResult:
         text = prompt_file.read_text(encoding="utf-8")
         parsed: object = json.JSONDecoder().raw_decode(text.split("DATA_JSON:\n", 1)[1])[0]
-        from reona._data import json_value
+        from reoengine._data import json_value
         envelope = object_value(json_value(parsed), "envelope")
         data = object_value(envelope["data"], "data")
         model = role_cfg.model

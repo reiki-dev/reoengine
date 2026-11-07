@@ -199,8 +199,8 @@ def _posix_descendants(root_pid: int) -> list[int]:
 
 
 def _environ_has_process_token(data: bytes, token: str) -> bool:
-    """Check procfs environ bytes for the exact Reona process token entry."""
-    expected = b"REONA_PROCESS_TOKEN=" + token.encode("ascii")
+    """Check procfs environ bytes for the exact ReOEngine process token entry."""
+    expected = b"REOENGINE_PROCESS_TOKEN=" + token.encode("ascii")
     return expected in data.split(b"\0")
 
 
@@ -281,7 +281,7 @@ def run_process(
     if os.name == "posix":
         launch_env = dict(os.environ if env is None else env)
         process_token = uuid.uuid4().hex
-        launch_env["REONA_PROCESS_TOKEN"] = process_token
+        launch_env["REOENGINE_PROCESS_TOKEN"] = process_token
     command = command_line(argv, launch_env)
     source: BinaryIO | None = stdin_file.open("rb") if stdin_file is not None else None
     started = time.monotonic()

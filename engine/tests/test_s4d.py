@@ -15,13 +15,13 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_repository
-from reona._data import Json, atomic_write, loads, object_value, read_lines, strings
-from reona.adapters.base import AgentResult
-from reona.cli import main
-from reona.config import Engine, Limits, RoleConfig
-from reona.fsm import RunInputs
-from reona.schemas import SchemaError, load_schema, normalize_input_plan, validate, validate_artifact
-from reona.state import Status, load_state
+from reoengine._data import Json, atomic_write, loads, object_value, read_lines, strings
+from reoengine.adapters.base import AgentResult
+from reoengine.cli import main
+from reoengine.config import Engine, Limits, RoleConfig
+from reoengine.fsm import RunInputs
+from reoengine.schemas import SchemaError, load_schema, normalize_input_plan, validate, validate_artifact
+from reoengine.state import Status, load_state
 
 
 class SchemaContractTests(unittest.TestCase):
@@ -133,7 +133,7 @@ class FindingAdapter(FakeAdapter):
 
 class PipelineContractTests(unittest.TestCase):
     def setUp(self) -> None:
-        temporary = tempfile.TemporaryDirectory(prefix="reona-s4d-")
+        temporary = tempfile.TemporaryDirectory(prefix="reoengine-s4d-")
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
         self.repo = make_repository(self.directory)
@@ -219,9 +219,9 @@ class PipelineContractTests(unittest.TestCase):
 
         out, err = io.StringIO(), io.StringIO()
         # Explicit CLI selection must win over a different environment/default directory.
-        with patch.dict(os.environ, {"REONA_CONFIG_DIR": str(self.directory / "other-config")}), \
+        with patch.dict(os.environ, {"REOENGINE_CONFIG_DIR": str(self.directory / "other-config")}), \
                 patch.object(fake, "invoke", side_effect=write_config), \
-                patch("reona.cli.codex_rate_limits", side_effect=AssertionError("No real probes")):
+                patch("reoengine.cli.codex_rate_limits", side_effect=AssertionError("No real probes")):
             code = main(["--config-dir", str(self.config), "run", "synthetic", "--task", str(task_path),
                          "--plan", str(plan_path)], root=self.directory, adapters={Engine.CODEX: fake}, out=out, err=err)
         self.assertEqual(code, 1, err.getvalue())

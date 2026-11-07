@@ -111,7 +111,7 @@ def codex_rate_limits(*, cwd: Path, event_log: EventLog, run_id: str,
                       command: Sequence[str] = ("codex",), timeout: float = 10.0) -> LimitRemaining | None:
     """JSON-RPC stdio probe. Unknown/unavailable limits produce a metadata-only event."""
     requests: Queue[str | None] = Queue()
-    requests.put('{"id":1,"method":"initialize","params":{"clientInfo":{"name":"reona","version":"0.1.0"}}}\n')
+    requests.put('{"id":1,"method":"initialize","params":{"clientInfo":{"name":"reoengine","version":"0.1.0"}}}\n')
     complete = threading.Event()
     buffer = bytearray()
     result: LimitRemaining | None = None

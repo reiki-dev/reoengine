@@ -13,14 +13,14 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_inputs, make_pipeline, make_repository
-from reona._data import Json, atomic_write, loads, object_value
-from reona.adapters.base import AgentResult
-from reona.config import Limits, RoleConfig, load_project
-from reona.fsm import InvalidDigest, Pipeline, _effective_review_approved, review_input_digest
-from reona.gates import HIGH_RISK_PATHS, risk_tier
-from reona.gitops import Change, Diff
-from reona.schemas import SchemaError, validate_artifact
-from reona.state import Stage, Status
+from reoengine._data import Json, atomic_write, loads, object_value
+from reoengine.adapters.base import AgentResult
+from reoengine.config import Limits, RoleConfig, load_project
+from reoengine.fsm import InvalidDigest, Pipeline, _effective_review_approved, review_input_digest
+from reoengine.gates import HIGH_RISK_PATHS, risk_tier
+from reoengine.gitops import Change, Diff
+from reoengine.schemas import SchemaError, validate_artifact
+from reoengine.state import Stage, Status
 
 
 def make_digest(paths: tuple[str, ...]) -> dict[str, Json]:
@@ -79,7 +79,7 @@ class RiskTierTests(unittest.TestCase):
                 self.assertEqual(risk_tier((path,)), "high")
 
     def test_nested_high_risk_paths(self) -> None:
-        paths = ("engine/reona/adapters/agy.py", "src/api/package.json", "sub/package-lock.json",
+        paths = ("engine/reoengine/adapters/agy.py", "src/api/package.json", "sub/package-lock.json",
                  "sub/pnpm-lock.yaml", "sub/yarn.lock", "sub/poetry.lock", "sub/uv.lock",
                  "src/auth/login.ts", "src/security/policy.ts", "src/lib/secrets/x.ts",
                  "src/db/token/store.ts", "a/b/config/x.json", "a/.github/workflows/ci.yml")

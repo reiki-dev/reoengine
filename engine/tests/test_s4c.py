@@ -15,15 +15,15 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, git_command, make_inputs, make_pipeline, make_repository
-from reona._data import read_lines
-from reona.adapters.agy import AgyAdapter
-from reona.adapters.base import AgentResult, ErrorKind
-from reona.config import Engine, RoleConfig
-from reona.events import Event, EventKind
-from reona.fsm import OutsideWrite, Pipeline, RunInputs
-from reona.gitops import Git
-from reona.guard import Category, OutsideGuard, SnapshotError, SourceSnapshot, source_snapshot
-from reona.state import Stage, Status, load_state
+from reoengine._data import read_lines
+from reoengine.adapters.agy import AgyAdapter
+from reoengine.adapters.base import AgentResult, ErrorKind
+from reoengine.config import Engine, RoleConfig
+from reoengine.events import Event, EventKind
+from reoengine.fsm import OutsideWrite, Pipeline, RunInputs
+from reoengine.gitops import Git
+from reoengine.guard import Category, OutsideGuard, SnapshotError, SourceSnapshot, source_snapshot
+from reoengine.state import Stage, Status, load_state
 
 
 class WritingAdapter(FakeAdapter):
@@ -46,7 +46,7 @@ class WritingAdapter(FakeAdapter):
 
 class SyntheticTest(unittest.TestCase):
     def setUp(self) -> None:
-        temporary = tempfile.TemporaryDirectory(prefix="reona-s4c-")
+        temporary = tempfile.TemporaryDirectory(prefix="reoengine-s4c-")
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
         self.repo = make_repository(self.directory)
@@ -95,7 +95,7 @@ class GuardTests(SyntheticTest):
                    "config": self.config / "nested/roles.toml",
                    "state_dir": self.directory / "state/overrides.json"}
         for category, target in targets.items():
-            with self.subTest(category=category), tempfile.TemporaryDirectory(prefix="reona-case-") as name:
+            with self.subTest(category=category), tempfile.TemporaryDirectory(prefix="reoengine-case-") as name:
                 case = Path(name)
                 # Each pipeline has its own run/state; source and config remain synthetic.
                 if category == "engine_state":
@@ -146,7 +146,7 @@ class GuardTests(SyntheticTest):
                     calls += 1
                     return None if calls == failed_snapshot else real_snapshot(git)
 
-                with patch("reona.guard.source_snapshot", side_effect=unavailable):
+                with patch("reoengine.guard.source_snapshot", side_effect=unavailable):
                     pipeline.start(make_inputs(tdd=False))
                 self.assert_source_snapshot_failure(pipeline, fake, failed_snapshot - 1)
                 self.assertEqual(calls, failed_snapshot)
@@ -159,7 +159,7 @@ class GuardTests(SyntheticTest):
         pipeline._set_inputs(make_inputs(tdd=False))
         for stage in (Stage.PREFLIGHT, Stage.BRIEF, Stage.PLAN):
             pipeline.execute_stage(stage)
-        with patch("reona.guard.source_snapshot", return_value=None):
+        with patch("reoengine.guard.source_snapshot", return_value=None):
             with self.assertRaisesRegex(SnapshotError, "^outside_snapshot_unavailable:source_repo$"):
                 pipeline.guard.snapshot()
             with self.assertRaisesRegex(OutsideWrite, "^outside_write:source_repo$") as error:
@@ -183,7 +183,7 @@ class GuardTests(SyntheticTest):
 
     def test_all_roles_and_exceptions_are_guarded(self) -> None:
         for role in ("coder", "reader", "reviewer", "researcher", "architect"):
-            with self.subTest(role=role), tempfile.TemporaryDirectory(prefix="reona-role-") as name:
+            with self.subTest(role=role), tempfile.TemporaryDirectory(prefix="reoengine-role-") as name:
                 target = self.config / "nested/roles.toml"
                 fake = WritingAdapter(lambda: target.write_text(role, encoding="utf-8"), role, raises=True)
                 pipeline = make_pipeline(Path(name), self.repo, fake, config_directory=self.config)
@@ -208,7 +208,7 @@ class GuardTests(SyntheticTest):
 
     def test_events_prefix_rewrite_truncate_and_delete_are_rejected(self) -> None:
         for mode in ("rewrite", "truncate", "delete"):
-            with self.subTest(mode=mode), tempfile.TemporaryDirectory(prefix="reona-events-") as name:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory(prefix="reoengine-events-") as name:
                 run = Path(name)
                 events = run / "events.jsonl"
                 original = b'{"synthetic":"original"}\n'
@@ -320,7 +320,7 @@ class DigestSchemaTests(SyntheticTest):
         pipeline, fake, calls = self.run_reader("good")
         self.assertEqual(pipeline.state.status, Status.AWAITING_HUMAN)
         argv = calls[0]["argv"]
-        self.assertEqual(argv[argv.index("--json-schema") + 1], str(ENGINE / "reona/_resources/schemas/review-digest.json"))
+        self.assertEqual(argv[argv.index("--json-schema") + 1], str(ENGINE / "reoengine/_resources/schemas/review-digest.json"))
         self.assertEqual([call.model for call in fake.calls], ["coder", "reviewer"])
         self.assertTrue((pipeline.directory / "review/review-digest.json").is_file())
 
@@ -523,16 +523,16 @@ class IgnoredSourceTests(SyntheticTest):
         source = self.pipeline().source
         # Git entries share the budget with four tree entries and another !! root.
         limit = self.entry_limit(5)
-        with patch("reona.guard.MAX_IGNORED_ENTRIES", limit):
+        with patch("reoengine.guard.MAX_IGNORED_ENTRIES", limit):
             self.assertIsNotNone(source_snapshot(source))
-        with patch("reona.guard.MAX_IGNORED_ENTRIES", limit - 1):
+        with patch("reoengine.guard.MAX_IGNORED_ENTRIES", limit - 1):
             self.assertIsNone(source_snapshot(source))
 
     def test_ignored_entry_limit_before_call_prevents_agent_launch(self) -> None:
         self.nested_file()
         fake = FakeAdapter()
         pipeline = self.pipeline(fake)
-        with patch("reona.guard.MAX_IGNORED_ENTRIES", self.entry_limit(3)):
+        with patch("reoengine.guard.MAX_IGNORED_ENTRIES", self.entry_limit(3)):
             pipeline.start(make_inputs(tdd=False))
         self.assert_source_snapshot_failure(pipeline, fake, 0)
 
@@ -547,7 +547,7 @@ class IgnoredSourceTests(SyntheticTest):
 
         fake = WritingAdapter(evade_snapshot)
         pipeline = self.pipeline(fake)
-        with patch("reona.guard.MAX_IGNORED_ENTRIES", self.entry_limit(4)):
+        with patch("reoengine.guard.MAX_IGNORED_ENTRIES", self.entry_limit(4)):
             self.assertIsNotNone(source_snapshot(pipeline.source))
             pipeline.start(make_inputs(tdd=False))
             self.assertIsNone(source_snapshot(pipeline.source))
@@ -562,7 +562,7 @@ class IgnoredSourceTests(SyntheticTest):
         self.nested_file()
         fake = FakeAdapter()
         pipeline = self.pipeline(fake)
-        with patch("reona.guard.MAX_IGNORED_ENTRIES", self.entry_limit(4)):
+        with patch("reoengine.guard.MAX_IGNORED_ENTRIES", self.entry_limit(4)):
             self.assertEqual(pipeline.start(make_inputs(tdd=False)).status, Status.AWAITING_HUMAN)
         self.assertEqual([call.model for call in fake.calls], ["coder", "reader", "reviewer"])
         self.assertFalse(self.events("outside_write_detected"))
@@ -591,7 +591,7 @@ class IgnoredSourceTests(SyntheticTest):
                 with self.subTest(target=target.name, error=error), patch.object(Path, "lstat", fail_stat):
                     self.assertIsNone(source_snapshot(source))
         for error in (PermissionError, OSError):
-            with self.subTest(error=error), patch("reona.guard.os.scandir", side_effect=error("synthetic walk error")):
+            with self.subTest(error=error), patch("reoengine.guard.os.scandir", side_effect=error("synthetic walk error")):
                 self.assertIsNone(source_snapshot(source))
         # A failure after scandir starts yielding must also invalidate the whole snapshot.
         def incomplete_scan(path: Path) -> object:
@@ -610,7 +610,7 @@ class IgnoredSourceTests(SyntheticTest):
                 return BrokenScan()
             return scandir(path)
 
-        with patch("reona.guard.os.scandir", side_effect=incomplete_scan):
+        with patch("reoengine.guard.os.scandir", side_effect=incomplete_scan):
             self.assertIsNone(source_snapshot(source))
 
     def test_disappearance_during_lstat_or_scandir_counts_as_change(self) -> None:
@@ -645,14 +645,14 @@ class IgnoredSourceTests(SyntheticTest):
             self.assertNotEqual(path, target)
             return scandir(path)
 
-        with patch("reona.guard.os.scandir", side_effect=no_link_scan), \
+        with patch("reoengine.guard.os.scandir", side_effect=no_link_scan), \
                 patch.object(Path, "open", side_effect=AssertionError("source content read")):
             before = source_snapshot(source)
             assert before is not None
             self.assertIn(link.relative_to(self.repo).as_posix(), before.paths)
             self.assertFalse(any(name.endswith("/external.txt") for name in before.paths))
         (target / "external.txt").write_text("synthetic changed target", encoding="utf-8")
-        with patch("reona.guard.os.scandir", side_effect=no_link_scan):
+        with patch("reoengine.guard.os.scandir", side_effect=no_link_scan):
             self.assertEqual(before, source_snapshot(source))
 
     def test_symlink_inside_ignored_directory_is_not_followed(self) -> None:

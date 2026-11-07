@@ -13,11 +13,11 @@ sys.path.insert(0, str(ENGINE))
 sys.path.insert(0, str(ENGINE / "tests/fakes"))
 
 from pipeline import FakeAdapter, make_pipeline, make_repository
-from reona.config import IsolationConfig, Limits, load_limits
-from reona.fsm import Status
-from reona.gates import GateRequest, plant_canary, run_gates
-from reona.gitops import Git
-from reona.schemas import validate_artifact
+from reoengine.config import IsolationConfig, Limits, load_limits
+from reoengine.fsm import Status
+from reoengine.gates import GateRequest, plant_canary, run_gates
+from reoengine.gitops import Git
+from reoengine.schemas import validate_artifact
 
 
 class IsolationTests(unittest.TestCase):

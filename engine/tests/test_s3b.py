@@ -13,12 +13,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "fakes"))
 
 from pipeline import FakeAdapter, git_command, make_inputs, make_pipeline, make_repository
-from reona._data import Json, atomic_write, object_value, read_lines
-from reona.config import Project, load_project
-from reona.gc import collect_run_links
-from reona.gitops import Git, SafetyError, ensure_safe_tree, secret_path, tree_hash
-from reona.runlinks import ensure_run_links, is_link, remove_run_links
-from reona.state import RunLock, Stage, Status, save_state
+from reoengine._data import Json, atomic_write, object_value, read_lines
+from reoengine.config import Project, load_project
+from reoengine.gc import collect_run_links
+from reoengine.gitops import Git, SafetyError, ensure_safe_tree, secret_path, tree_hash
+from reoengine.runlinks import ensure_run_links, is_link, remove_run_links
+from reoengine.state import RunLock, Stage, Status, save_state
 
 
 class S3bTests(unittest.TestCase):
@@ -178,7 +178,7 @@ class S3bTests(unittest.TestCase):
         run = self.directory / "run"
         run.mkdir()
         ensure_run_links(run, {"node_modules": target})
-        from reona.state import RunState
+        from reoengine.state import RunState
         save_state(run, RunState(run.name, stage=Stage.IMPLEMENT, status=Status.RUNNING))
         self.assertEqual(collect_run_links(self.directory), 0)
         target.rmdir()

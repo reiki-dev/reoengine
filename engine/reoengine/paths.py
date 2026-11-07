@@ -6,13 +6,13 @@ from pathlib import Path
 
 
 def neutral_path() -> Path:
-    value = os.environ.get("REONA_NEUTRAL_DIR")
+    value = os.environ.get("REOENGINE_NEUTRAL_DIR")
     if value:
         return Path(value).resolve()
     local = os.environ.get("LOCALAPPDATA")
     if local:
-        return Path(local).resolve() / "reona" / "neutral"
+        return Path(local).resolve() / "reoengine" / "neutral"
     state_home = os.environ.get("XDG_STATE_HOME")
     if state_home:
-        return Path(state_home).resolve() / "reona" / "neutral"
-    return Path.home() / ".local" / "state" / "reona" / "neutral"
+        return Path(state_home).resolve() / "reoengine" / "neutral"
+    return Path.home() / ".local" / "state" / "reoengine" / "neutral"

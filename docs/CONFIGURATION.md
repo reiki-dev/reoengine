@@ -1,14 +1,14 @@
 # Configuration reference
 
 The engine reads one configuration directory (`config/` by default; override with
-`--config-dir` or `REONA_CONFIG_DIR`). Loaders are strict: unknown keys are rejected.
+`--config-dir` or `REOENGINE_CONFIG_DIR`). Loaders are strict: unknown keys are rejected.
 Mutable state lives in `state/` and run data in `runs/` (`--state-dir`, `--runs-dir`,
-`REONA_STATE_DIR`, `REONA_RUNS_DIR`). The engine never rewrites your configuration files.
+`REOENGINE_STATE_DIR`, `REOENGINE_RUNS_DIR`). The engine never rewrites your configuration files.
 
 ## Variables in project files
 
 In `config/projects/*.toml`, string values for `repo`, `links.*` and check argv elements may use
-`${REONA_ROOT}` (the repository root), `${HOME}`, and `${ENV:NAME}` (an environment variable; a
+`${REOENGINE_ROOT}` (the repository root), `${HOME}`, and `${ENV:NAME}` (an environment variable; a
 missing variable is an error that names it). `repo` must be absolute after expansion.
 
 ## `roles.toml`
