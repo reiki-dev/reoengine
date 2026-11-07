@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.1.0] - 2026-11-07
 
 ### Security
 - Tightened process cleanup, executable path resolution, outside-write snapshots, wrapper link validation, and API request URL/deadline/response-completion checks; documented guard, isolation, gate, redaction, and POST retry limits.

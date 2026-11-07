@@ -31,6 +31,12 @@ the agents you already use in a process that a team can defend:
 Not an autonomous developer, not a sandbox, not a compliance certification, not a hosted service.
 See [known limits](docs/SECURITY_AND_COMPLIANCE.md#6-known-limits-read-before-relying-on-this).
 
+## Status
+
+Version 0.1.0 is a first public release. The Gemini API adapter was checked against the provider
+documentation but has not been exercised against the live service yet; the Anthropic and OpenAI API
+adapters are experimental. Install from GitHub (not yet on PyPI).
+
 ## Install
 
 ```bash
