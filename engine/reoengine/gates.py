@@ -32,6 +32,12 @@ _KNOWN_OUTPUT_TOKENS = re.compile(
     r"|(?:AKIA|ASIA)[A-Z0-9]{16}"
     r"|(?:ghp_|gho_|ghs_|github_pat_)[A-Za-z0-9_]+"
     r"|sk-[A-Za-z0-9_-]{20,}"
+    r"|npm_[A-Za-z0-9]{36}"
+    r"|(?:sk|rk|pk)_live_[A-Za-z0-9]{16,}"
+    r"|AccountKey=[A-Za-z0-9+/=]{20,}"
+    r"|SharedAccessSignature=\S+"
+    r"|sig=[A-Za-z0-9%+/=]{20,}"
+    r"|hooks\.slack\.com/services/\S+"
     r"|xox[abprs]-[A-Za-z0-9-]+"
     r"|AIza[A-Za-z0-9_-]{35}"
 )
@@ -40,6 +46,7 @@ _PRIVATE_KEY_BLOCK = re.compile(
     r"(?:.*?-----END [A-Z0-9 ]*PRIVATE KEY-----|.*\Z)", re.DOTALL
 )
 _TOKEN_ASSIGNMENT = re.compile(r"\w*token\w*[\"']?\s*[:=]\s*\S", re.IGNORECASE)
+_GOOGLE_SERVICE_ACCOUNT = re.compile(r'"(?:type"\s*:\s*"service_account|private_key_id")', re.IGNORECASE)
 # Avoid matching fragments of file paths containing dots or Windows separators.
 _OUTPUT_TOKEN = re.compile(r"(?<![A-Za-z0-9+/_=.\\-])[A-Za-z0-9+/_=-]{16,}(?![A-Za-z0-9+/_=.\\-])")
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
@@ -91,6 +98,7 @@ def sanitize_output(text: str) -> str:
     for line in text.split("\n"):
         lowered = line.casefold()
         if (any(word in lowered for word in _SECRET_WORDS)
+                or _GOOGLE_SERVICE_ACCOUNT.search(line)
                 or _TOKEN_ASSIGNMENT.search(line)
                 or any(fnmatch.fnmatchcase(lowered, f"*{pattern}*") for pattern in SECRET_PATTERNS)):
             lines.append("[line redacted]")
@@ -101,13 +109,29 @@ def sanitize_output(text: str) -> str:
 
 
 def build_restricted_env(overrides: Mapping[str, str] | None = None,
-                         source: Mapping[str, str] | None = None) -> dict[str, str]:
+                         source: Mapping[str, str] | None = None,
+                         exclude_dirs: Sequence[Path] = ()) -> dict[str, str]:
     """Filter environment variables and stub proxies; direct sockets remain unblocked.
 
     This provides neither network nor filesystem isolation.
     """
     original = os.environ if source is None else source
     env = {name: value for name, value in original.items() if name.upper() in ENV_ALLOW}
+    if "PATH" in env:
+        excluded = [os.path.normcase(str(path.resolve())) for path in exclude_dirs]
+        entries: list[str] = []
+        for entry in env["PATH"].split(os.pathsep):
+            candidate = Path(entry)
+            if not entry or not candidate.is_absolute():
+                continue
+            resolved = os.path.normcase(str(candidate.resolve()))
+            try:
+                if any(os.path.commonpath((resolved, root)) == root for root in excluded):
+                    continue
+            except ValueError:  # Different Windows drives cannot be descendants.
+                pass
+            entries.append(entry)
+        env["PATH"] = os.pathsep.join(entries)
     for name, value in (overrides or {}).items():
         if name.upper().startswith(("PYTHON", "GIT_", "LD_", "DYLD_")) or name.upper() in {
                 "PATH", "PATHEXT", "COMSPEC", "SYSTEMROOT", "WINDIR"}:
@@ -193,6 +217,13 @@ HIGH_RISK_PATHS = ("**/adapters/**", "**/gates.py", "**/guard.py", "**/gitops.py
                    "**/*.key", "**/.gitmodules", "**/.gitattributes")
 
 
+def diff_changed_lines(diff_patch: bytes) -> int:
+    """Count added and removed diff lines, excluding file headers."""
+    return sum(1 for line in diff_patch.decode("utf-8", errors="replace").splitlines()
+               if (line.startswith("+") and not line.startswith("+++ "))
+               or (line.startswith("-") and not line.startswith("--- ")))
+
+
 def risk_tier(changed_paths: Sequence[str], *, high_risk_paths: Sequence[str] = (),
               tdd_gate: bool = True, diff_patch: bytes = b"",
               review_full_diff_lines: int = 400) -> Literal["normal", "high"]:
@@ -200,9 +231,7 @@ def risk_tier(changed_paths: Sequence[str], *, high_risk_paths: Sequence[str] = 
     if not tdd_gate or any(_matches(normalized_path(path), normalized_path(pattern))
                            for path in changed_paths for pattern in (*HIGH_RISK_PATHS, *high_risk_paths)):
         return "high"
-    changed_lines = sum(1 for line in diff_patch.decode("utf-8", errors="replace").splitlines()
-                        if (line.startswith("+") and not line.startswith("+++ "))
-                        or (line.startswith("-") and not line.startswith("--- ")))
+    changed_lines = diff_changed_lines(diff_patch)
     if changed_lines > review_full_diff_lines:
         return "high"
     return "normal"
@@ -267,6 +296,7 @@ class GateRequest:
     canary_hash: str = hashlib.sha256(CANARY_TEXT.encode()).hexdigest()
     isolation_mode: str = "env"
     isolation_wrapper: tuple[str, ...] = ()
+    path_exclude_dirs: tuple[Path, ...] = ()
 
 
 def plant_canary(git: Git) -> str:
@@ -298,7 +328,7 @@ def _execute(name: str, argv: Sequence[str], cwd: Path, request: GateRequest) ->
                 raise ValueError("Invalid isolation wrapper")
             command = (*wrapper, *command)
         result: ProcessResult = run_process(command, cwd=cwd, timeout=request.timeout,
-                                            env=build_restricted_env(request.offline_env), tail_bytes=7168)
+                                            env=build_restricted_env(request.offline_env, exclude_dirs=(*request.path_exclude_dirs, cwd)), tail_bytes=7168)
         outcome = _check_kind(result.exit_code, result.stdout_tail, result.stderr_tail,
                               timed_out=result.timed_out)
         return GateCheck(name, outcome == "pass",

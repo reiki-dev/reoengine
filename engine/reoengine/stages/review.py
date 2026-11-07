@@ -7,13 +7,13 @@ from typing import cast
 from .. import fsm
 from .._data import Json, atomic_write, encode, loads, object_value, string
 from ..events import EventKind, sha256_file
-from ..gates import risk_tier
+from ..gates import diff_changed_lines, risk_tier
 from ..gitops import Diff
 from ..review_policy import (_diff_sections, _effective_review_approved, _excerpt_in_section,
                              _incomplete_review, _line_in_section, review_input_digest)
 from ..schemas import validate_artifact
 from ..skills import select_skills
-from ..state import Stage
+from ..state import Stage, Status
 from ..fsm import InvalidDigest, StageError
 from ..prompt import Prompt
 from ._base import StageContext
@@ -23,6 +23,8 @@ class ReviewMixin(StageContext):
             review_directory = self.directory / "review"
             review_directory.mkdir(parents=True, exist_ok=True)
             diff = self.git.diff(self.state.base_sha)
+            if diff_changed_lines(diff.patch) > self.config.limits.review_max_diff_lines:
+                return self._result(Status.STOPPED, stop_reason="diff_too_large")
             binding = self._review_binding(diff)
             (review_directory / "diff.patch").write_bytes(diff.patch)
             data: dict[str, Json] = {"task": self.inputs.task, "allowed_paths": list(self._allowed()),
@@ -72,9 +74,7 @@ class ReviewMixin(StageContext):
             gates_sha256 = sha256_file(self._artifact(Stage.GATES))
             path_tier = risk_tier(diff.paths, high_risk_paths=self.project.high_risk_paths,
                                   tdd_gate=self.inputs.task["tdd_gate"] is True)
-            diff_lines = sum(1 for line in diff.patch.decode("utf-8", errors="replace").splitlines()
-                             if (line.startswith("+") and not line.startswith("+++ "))
-                             or (line.startswith("-") and not line.startswith("--- ")))
+            diff_lines = diff_changed_lines(diff.patch)
             reason = ("high_risk_path" if path_tier == "high" else
                       "diff_size" if diff_lines > self.config.limits.review_full_diff_lines else "normal")
             tier = risk_tier(diff.paths, high_risk_paths=self.project.high_risk_paths,

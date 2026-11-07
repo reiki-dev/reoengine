@@ -137,6 +137,7 @@ class Limits:
     isolation: IsolationConfig = field(default_factory=IsolationConfig)
     review_full_diff_lines: int = 400
     failure_ttl_days: int = 7
+    review_max_diff_lines: int = 5000
 
 
 @dataclass(frozen=True)
@@ -329,7 +330,7 @@ def load_limits(path: Path) -> Limits:
     data = _toml(path)
     keys(data, {"max_slots", "slots", "timeout_seconds", "max_fix_rounds", "fix_loop_token_budget",
                 "fix_loop_no_progress_stop", "max_prompt_bytes",
-                "review_full_diff_lines", "failure_ttl_days", "limit_threshold_percent", "quota", "timeouts", "isolation"}, str(path))
+                "review_full_diff_lines", "review_max_diff_lines", "failure_ttl_days", "limit_threshold_percent", "quota", "timeouts", "isolation"}, str(path))
     default = Limits()
     slots_data = object_value(data.get("slots", dict(default.slots)), f"{path}.slots")
     keys(slots_data, {"coder", "reviewer", "readers", "council"}, f"{path}.slots")
@@ -370,14 +371,18 @@ def load_limits(path: Path) -> Limits:
         raise ValueError(f"{path}.isolation.wrapper: executable must not be empty")
     if isolation_mode == "wrapper" and not isolation_wrapper:
         raise ValueError(f"{path}.isolation.wrapper: required when mode is 'wrapper'")
+    review_full_diff_lines = integer(data.get("review_full_diff_lines", 400), "review_full_diff_lines", 1)
+    review_max_diff_lines = integer(data.get("review_max_diff_lines", 5000), "review_max_diff_lines", 1)
+    if review_max_diff_lines < review_full_diff_lines:
+        raise ValueError("review_max_diff_lines must be >= review_full_diff_lines")
     return Limits(maximum, slots, timeout, integer(data.get("max_fix_rounds", 3), "max_fix_rounds"),
                   integer(data.get("fix_loop_token_budget", 400_000), "fix_loop_token_budget"),
                   boolean(data.get("fix_loop_no_progress_stop", True), "fix_loop_no_progress_stop"),
                   integer(data.get("max_prompt_bytes", 2_097_152), "max_prompt_bytes", 1),
                   threshold, QuotaConfig(exit_codes, patterns), timeouts,
                   IsolationConfig(isolation_mode, isolation_wrapper),
-                  integer(data.get("review_full_diff_lines", 400), "review_full_diff_lines", 1),
-                  integer(data.get("failure_ttl_days", 7), "failure_ttl_days", 1))
+                  review_full_diff_lines, integer(data.get("failure_ttl_days", 7), "failure_ttl_days", 1),
+                  review_max_diff_lines)
 
 
 def _checks(value: Json, where: str, path: Path | None = None) -> tuple[tuple[str, ...], ...]:

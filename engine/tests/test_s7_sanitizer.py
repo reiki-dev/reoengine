@@ -26,6 +26,15 @@ class S7SanitizerTests(unittest.TestCase):
             ("password", "password=" + "Ij7" * 12, "Ij7" * 4),
             ("JWT", "eyJ4Ijoi" + "SYNTHETIC" + ".eyJ5Ijoi" + "VALUE" + "." + "Z" * 24,
              "SYNTHETIC"),
+            ("npm", "npm_" + "N" * 36, "N" * 12),
+            ("Stripe live", "sk_live_" + "S" * 24, "S" * 12),
+            ("Stripe restricted", "rk_live_" + "R" * 24, "R" * 12),
+            ("Stripe publishable", "pk_live_" + "P" * 24, "P" * 12),
+            ("Azure AccountKey", "AccountKey=" + "A" * 24 + "+/=", "A" * 12),
+            ("Azure SAS", "SharedAccessSignature=" + "S" * 24, "S" * 12),
+            ("Azure sig", "sig=" + "s" * 24 + "%2F", "s" * 12),
+            ("Slack webhook", "hooks.slack.com/services/T00000000/B00000000/" + "W" * 24,
+             "W" * 12),
         )
 
     def feedback_tail(self, secret: str, *, crosses_boundary: bool) -> str:
@@ -38,6 +47,14 @@ class S7SanitizerTests(unittest.TestCase):
         self.assertIsInstance(tail, str)
         assert isinstance(tail, str)
         return tail
+
+    def test_google_service_account_json_line_is_fully_redacted(self) -> None:
+        for line in (
+            '{"type": "service_account", "private_key_id": "SYNTHETIC_KEY_ID", "project_id": "demo"}',
+            '{"private_key_id":"SYNTHETIC_KEY_ID","other":"safe"}',
+        ):
+            with self.subTest(line=line):
+                self.assertEqual(sanitize_output(line), "[line redacted]")
 
     def test_synthetic_secret_formats_are_redacted_before_tail_truncation(self) -> None:
         for name, secret, significant_part in self.secret_cases():

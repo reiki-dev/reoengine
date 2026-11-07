@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import sys
@@ -94,6 +94,23 @@ class ReviewTierTests(unittest.TestCase):
         binding = object_value(loads((pipeline.directory / "review/binding.json").read_text()), "binding")
         self.assertEqual(binding["review_mode"], "full_diff")
         self.assertEqual(binding["review_reason"], "diff_size")
+
+    def test_diff_over_review_limit_stops_before_reader(self) -> None:
+        adapter = ReviewTierAdapter(changed_lines=5001)
+        pipeline = make_pipeline(self.root, self.repo, adapter,
+                                 limits=Limits(max_fix_rounds=0, review_max_diff_lines=5000))
+        pipeline.start(make_inputs())
+        self.assertEqual(pipeline.state.status.value, "stopped")
+        result = object_value(loads((pipeline.directory / "result.json").read_text()), "result")
+        self.assertEqual(result["stop_reason"], "diff_too_large")
+        self.assertFalse(any(call.model.startswith(("reader", "reviewer")) for call in adapter.calls))
+
+    def test_diff_at_review_limit_continues_to_reader(self) -> None:
+        adapter = ReviewTierAdapter(changed_lines=4994)
+        pipeline = make_pipeline(self.root, self.repo, adapter,
+                                 limits=Limits(max_fix_rounds=0, review_max_diff_lines=5000))
+        pipeline.start(make_inputs())
+        self.assertTrue(any(call.model.startswith("reader") for call in adapter.calls))
 
     def test_oversized_full_diff_fails_before_reviewer_invocation(self) -> None:
         adapter = ReviewTierAdapter(changed_lines=401, inflate_digest=True)

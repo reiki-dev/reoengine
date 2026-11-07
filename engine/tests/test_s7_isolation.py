@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from dataclasses import replace
 from pathlib import Path
 
@@ -15,7 +16,9 @@ sys.path.insert(0, str(ENGINE / "tests/fakes"))
 from pipeline import FakeAdapter, make_pipeline, make_repository
 from reoengine.config import IsolationConfig, Limits, load_limits
 from reoengine.fsm import Status
-from reoengine.gates import GateRequest, plant_canary, run_gates
+from reoengine.doctor import diagnose
+from reoengine.procs import ProcessResult
+from reoengine.gates import GateRequest, build_restricted_env, plant_canary, run_gates
 from reoengine.gitops import Git
 from reoengine.schemas import validate_artifact
 
@@ -35,8 +38,13 @@ class IsolationTests(unittest.TestCase):
         limits = load_limits(config)
         self.assertEqual(limits.isolation.mode, "wrapper")
         self.assertEqual(limits.isolation.wrapper, ("python", "-c", "pass"))
+        self.assertEqual(limits.review_max_diff_lines, 5000)
+        config.write_text("review_full_diff_lines = 400\nreview_max_diff_lines = 5000\n", encoding="utf-8")
+        self.assertEqual(load_limits(config).review_max_diff_lines, 5000)
 
         invalid = (
+            "review_max_diff_lines = 0\n",
+            "review_full_diff_lines = 501\nreview_max_diff_lines = 500\n",
             '[isolation]\nmode = "bad"\n',
             '[isolation]\nmode = "wrapper"\n',
             '[isolation]\nmode = "wrapper"\nwrapper = []\n',
@@ -49,6 +57,25 @@ class IsolationTests(unittest.TestCase):
                 config.write_text(source, encoding="utf-8")
                 with self.assertRaises(ValueError):
                     load_limits(config)
+
+    def test_restricted_path_filters_relative_and_worktree_entries(self) -> None:
+        worktree = self.root / "worktree"
+        worktree.mkdir()
+        system = self.root / "system-bin"
+        system.mkdir()
+        source = {"PATH": os.pathsep.join(("relative/bin", str(worktree / "bin"), str(system)))}
+        env = build_restricted_env(source=source, exclude_dirs=(worktree,))
+        self.assertEqual(env["PATH"], str(system))
+        self.assertEqual(build_restricted_env(source={"PATH": "relative/bin"},
+                                              exclude_dirs=(worktree,))["PATH"], "")
+
+    @unittest.skipUnless(os.name == "nt", "Windows path comparisons are case insensitive")
+    def test_restricted_path_exclusion_is_case_insensitive_on_windows(self) -> None:
+        worktree = self.root / "WorkTree"
+        worktree.mkdir()
+        variant = str(worktree).swapcase()
+        self.assertEqual(build_restricted_env(source={"PATH": variant},
+                                              exclude_dirs=(worktree,))["PATH"], "")
 
     def test_wrapper_executes_check_and_gates_artifact_records_outcomes(self) -> None:
         repo = make_repository(self.root)
@@ -76,6 +103,27 @@ class IsolationTests(unittest.TestCase):
         project_check = next(check for check in artifact["checks"] if check["name"] == "project:0")
         self.assertEqual(project_check["outcome"], "pass")
         self.assertTrue(report.passed)
+
+    def test_doctor_reports_isolation_mode_and_wrapper_availability(self) -> None:
+        config = self.root / "config"
+        config.mkdir()
+        config.joinpath("limits.toml").write_text("[isolation]\nmode = \"env\"\n", encoding="utf-8")
+        probe = lambda argv: ProcessResult(0, "version", "", 0.0)
+        with patch("reoengine.doctor._validate_neutral_directory"):
+            diagnostics = diagnose(config, self.root / "state", home=self.root,
+                                  neutral_directory=self.root, probe=probe, roles_file=self.root / "missing.toml")
+        self.assertTrue(any(d.name == "isolation" and d.level == "warning" and
+                            d.detail == "checks run with environment filtering only; see docs/ISOLATION.md"
+                            for d in diagnostics))
+        config.joinpath("limits.toml").write_text(
+            '[isolation]\nmode = "wrapper"\nwrapper = ["reoengine-missing-wrapper-xyz"]\n',
+            encoding="utf-8")
+        with patch("reoengine.doctor._validate_neutral_directory"):
+            diagnostics = diagnose(config, self.root / "state", home=self.root,
+                                  neutral_directory=self.root, probe=probe, roles_file=self.root / "missing.toml")
+        self.assertTrue(any(d.name == "isolation" and d.level == "error" and
+                            d.detail == "wrapper executable not found: reoengine-missing-wrapper-xyz"
+                            for d in diagnostics))
 
     def test_env_only_result_warns_about_isolation_and_links(self) -> None:
         repo = make_repository(self.root)

@@ -13,7 +13,7 @@ from typing import Literal
 from . import procs
 from ._data import loads, object_value
 from .adapters.claude import _validate_neutral_directory
-from .config import Engine, effective_roles, load_pricing, load_project, load_roles
+from .config import Engine, Limits, effective_roles, load_limits, load_pricing, load_project, load_roles
 from .paths import neutral_path
 
 Probe = Callable[[Sequence[str]], procs.ProcessResult]
@@ -52,6 +52,21 @@ def diagnose(config_directory: Path, state_directory: Path, *, home: Path | None
         except (OSError, ValueError, RuntimeError):
             checks.append(Diagnostic("error" if name == "git" else "warning", name, "binary unavailable"))
     checks.append(Diagnostic("OK" if config_directory.is_dir() else "error", "config", str(config_directory)))
+    limits_path = config_directory / "limits.toml"
+    try:
+        limits = load_limits(limits_path) if limits_path.exists() else Limits()
+        if limits.isolation.mode == "env":
+            checks.append(Diagnostic("warning", "isolation",
+                                     "checks run with environment filtering only; see docs/ISOLATION.md"))
+        else:
+            executable = limits.isolation.wrapper[0]
+            try:
+                procs.resolve_executable(executable)
+            except (OSError, ValueError):
+                checks.append(Diagnostic("error", "isolation",
+                                         f"wrapper executable not found: {executable}"))
+    except (OSError, ValueError):
+        pass
     try:
         roles = load_roles(roles_file if roles_file is not None else config_directory / "roles.toml")
         defaults = {Engine.ANTHROPIC: "ANTHROPIC_API_KEY", Engine.OPENAI: "OPENAI_API_KEY",

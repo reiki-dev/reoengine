@@ -116,16 +116,20 @@ python -m mypy --strict reoengine                 # type check
 Tests use fake CLIs and local fake HTTP servers; they need no network, accounts or keys.
 Optional live smoke tests against real CLIs are not part of the default run.
 
-## Placeholders to fill before publishing
+## Documentation
 
-This repository was prepared for publication with placeholders where a person's details are needed.
-Search for these and replace them:
+| Page | What it covers |
+|---|---|
+| [docs/SECURITY_AND_COMPLIANCE.md](docs/SECURITY_AND_COMPLIANCE.md) | What the models see, what is recorded, controls and their limits |
+| [docs/PROVIDER_TERMS.md](docs/PROVIDER_TERMS.md) | Subscription vs API use, what each provider's terms say |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Every configuration file and key |
+| [docs/ISOLATION.md](docs/ISOLATION.md) | Running project checks behind a sandbox wrapper |
+| [docs/RUN_LAYOUT.md](docs/RUN_LAYOUT.md) | What is written to `runs/` and `state/` |
+| [docs/DESIGN.md](docs/DESIGN.md) | Why the engine is built this way |
+| [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) | Project housekeeping |
 
-| Placeholder | Where | Fill with |
-|---|---|---|
-| Copyright holder `reiki-dev` | `NOTICE` | Already set to the publisher handle; change it if the holder should be a person or company |
-| Private vulnerability reporting | GitHub repository settings | Enable it (Security tab); `SECURITY.md` relies on it |
-| Provider prices | `config/pricing.toml` | Current prices per million tokens from your provider; ships empty |
+Provider prices are not shipped: `config/pricing.toml` is empty until you fill it in from your
+provider's current price list.
 
 ## License
 

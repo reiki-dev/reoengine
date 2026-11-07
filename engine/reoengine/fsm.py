@@ -455,7 +455,7 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
         inputs, outputs = dict(self.state.input_hashes), dict(self.state.output_hashes)
         inputs[key], outputs[key] = input_hash, sha256_file(artifact)
         status = (Status.AWAITING_HUMAN if stage == Stage.ACCEPT else Status.STOPPED
-                  if stage == Stage.FIX_LOOP and output.get("status") == "stopped" else Status.COMPLETED)
+                  if output.get("status") == "stopped" else Status.COMPLETED)
         next_attempt = self.state.attempt + 1 if stage == Stage.FIX_LOOP and status != Status.STOPPED else self.state.attempt
         self._save(status=status, attempt=next_attempt,
                    input_hashes=inputs, output_hashes=outputs,

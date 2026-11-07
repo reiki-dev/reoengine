@@ -22,7 +22,8 @@ class GatesFixMixin(StageContext):
                                   target_checks=self._task_checks(),
                                   timeout=self.config.limits.timeout_seconds, offline_env=self.project.offline_env,
                                   isolation_mode=self.config.limits.isolation.mode,
-                                  isolation_wrapper=self.config.limits.isolation.wrapper)
+                                  isolation_wrapper=self.config.limits.isolation.wrapper,
+                                  path_exclude_dirs=(self.git.root, self.directory))
             report = run_gates(self.git, request, self.directory / "gates.json",
                                on_tdd_disabled=lambda reason: self._event(EventKind.TDD_DISABLED, input_hash=_digest(reason)),
                                diff_output=self.directory / "review" / "diff.patch")

@@ -613,10 +613,10 @@ class S6EnvironmentSecurityTests(unittest.TestCase):
     def test_build_restricted_env_exists(self) -> None:
         builder = getattr(gates, 'build_restricted_env', None)
         self.assertTrue(callable(builder), 'Expose environment filtering without promising network isolation')
-        source = {'PATH': 'synthetic-bin', 'TOKEN': 'synthetic-secret', 'HOME': 'synthetic-home',
+        source = {'PATH': str(Path(__file__).resolve().parent), 'TOKEN': 'synthetic-secret', 'HOME': 'synthetic-home',
                   'SERVICE_HOST': 'synthetic-host', 'https_proxy': 'synthetic-proxy'}
         env = builder({'CUSTOM': 'synthetic-value', 'API_BASE_URL': 'synthetic-url'}, source)
-        self.assertEqual(env['PATH'], 'synthetic-bin')
+        self.assertEqual(env['PATH'], source['PATH'])
         self.assertEqual(env['CUSTOM'], 'synthetic-value')
         self.assertNotIn('TOKEN', env)
         self.assertNotIn('HOME', env)

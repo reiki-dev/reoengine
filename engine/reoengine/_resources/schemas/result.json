@@ -152,7 +152,8 @@
       "enum": [
         "no_progress",
         "fix_loop_budget",
-        "max_fix_rounds"
+        "max_fix_rounds",
+        "diff_too_large"
       ]
     },
     "usage_summary": {

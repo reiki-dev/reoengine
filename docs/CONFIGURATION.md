@@ -58,6 +58,7 @@ compact report. The old `preflight` command remains as a deprecated compatibilit
 | `fix_loop_token_budget` | 400000 | Stop when the run's coder tokens exceed this (0 disables) |
 | `fix_loop_no_progress_stop` | true | Stop when a round neither reduces failed checks nor changes the diff |
 | `review_full_diff_lines` | 400 | A diff larger than this is reviewed against the full patch |
+| `review_max_diff_lines` | 5000 | Stop before review when a diff exceeds this many changed lines (must be at least `review_full_diff_lines`) |
 | `max_prompt_bytes` | 2097152 | Hard cap on a prompt |
 | `failure_ttl_days` | 7 | Retention of bounded failure tails under `runs/*/fail/` |
 | `[quota]` | | Exit codes and stderr patterns that mean "quota exhausted" |
@@ -70,6 +71,8 @@ Example wrapper (Linux, `bubblewrap` installed; adapt and test it yourself):
 mode = "wrapper"
 wrapper = ["bwrap", "--ro-bind", "/", "/", "--bind", "{worktree}", "{worktree}", "--unshare-net", "--chdir", "{worktree}"]
 ```
+
+For example wrapper configurations, see [ISOLATION.md](ISOLATION.md).
 
 ## `pricing.toml` (optional)
 

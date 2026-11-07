@@ -6,6 +6,7 @@ fix_loop_no_progress_stop = true
 # TZ leaves these two magnitudes open; conservative initial values.
 max_prompt_bytes = 2097152
 review_full_diff_lines = 400
+review_max_diff_lines = 5000
 failure_ttl_days = 7
 limit_threshold_percent = 80
 
