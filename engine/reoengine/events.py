@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
-from ._data import Json, append_line, encode, file_lock, number
+from ._data import Json, encode, file_lock, loads, number, object_value
 from .config import Engine
 from .state import Stage
 
@@ -124,13 +124,98 @@ class EventLog:
         self.path = run_directory / "events.jsonl"
 
     def append(self, event: Event, *, preserve_tail: bool = False) -> None:
-        if not preserve_tail:
-            append_line(self.path, event.to_json())
-            return
-        # Preserve evidence even if an agent truncated/corrupted the old tail.
-        # The separator ensures the detection record starts on its own line.
-        with self.path.open("ab") as stream:
-            with file_lock(stream.fileno()):
-                stream.write(b"\n" + encode(event.to_json()))
-                stream.flush()
-                os.fsync(stream.fileno())
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0), 0o600)
+        try:
+            with file_lock(fd):
+                end = os.lseek(fd, 0, os.SEEK_END)
+                if end:
+                    os.lseek(fd, end - 1, os.SEEK_SET)
+                    complete = os.read(fd, 1) == b"\n"
+                else:
+                    complete = True
+                if not complete and not preserve_tail:
+                    # Retain the established incomplete-tail recovery behavior.
+                    from ._data import _recover_tail
+                    _recover_tail(fd, self.path)
+                    end = os.lseek(fd, 0, os.SEEK_END)
+                    complete = True
+                if end and complete:
+                    tail_start = end - 1
+                    while tail_start:
+                        position = max(0, tail_start - 8192)
+                        os.lseek(fd, position, os.SEEK_SET)
+                        chunk = os.read(fd, tail_start - position)
+                        newline = chunk.rfind(b"\n")
+                        if newline >= 0:
+                            tail_start = position + newline + 1
+                            break
+                        tail_start = position
+                    os.lseek(fd, tail_start, os.SEEK_SET)
+                    previous = os.read(fd, end - tail_start - 1)
+                    try:
+                        previous_value = object_value(loads(previous.decode("utf-8")), "event")
+                    except (UnicodeError, ValueError):
+                        previous_value = {}
+                    previous_seq = previous_value.get("seq")
+                    if type(previous_seq) is int and previous_seq >= 0:
+                        seq = previous_seq + 1
+                    else:
+                        # Count the legacy prefix once, when introducing the chain.
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        with os.fdopen(os.dup(fd), "rb") as stream:
+                            seq = sum(1 for line in stream if line.endswith(b"\n"))
+                    prev = hashlib.sha256(previous).hexdigest()
+                else:
+                    seq, prev = 0, "0" * 64
+                data = event.to_json()
+                data["seq"], data["prev"] = seq, prev
+                payload = encode(data)
+                os.lseek(fd, 0, os.SEEK_END)
+                if not complete and preserve_tail:
+                    payload = b"\n" + payload
+                from ._data import _write_all
+                _write_all(fd, payload)
+                os.fsync(fd)
+        finally:
+            os.close(fd)
+
+
+@dataclass(frozen=True)
+class ChainResult:
+    ok: bool
+    events: int
+    index: int | None = None
+    reason: str | None = None
+
+
+def verify_chain(path: Path) -> ChainResult:
+    previous = "0" * 64
+    chained = False
+    count = 0
+    try:
+        with path.open("rb") as stream:
+            for index, raw in enumerate(stream):
+                if not raw.endswith(b"\n"):
+                    return ChainResult(False, count, index, "incomplete line")
+                line = raw[:-1]
+                try:
+                    value = object_value(loads(line.decode("utf-8")), "event")
+                except (UnicodeError, ValueError):
+                    return ChainResult(False, count, index, "invalid JSON line")
+                if "seq" not in value and "prev" not in value:
+                    if chained:
+                        return ChainResult(False, count, index, "legacy line after chain")
+                    previous = hashlib.sha256(line).hexdigest()
+                else:
+                    chained = True
+                    seq, prev = value.get("seq"), value.get("prev")
+                    if type(seq) is not int or seq != index:
+                        return ChainResult(False, count, index, "invalid sequence")
+                    if not isinstance(prev, str) or prev != previous:
+                        return ChainResult(False, count, max(0, index - 1), "previous hash mismatch")
+                    previous = hashlib.sha256(line).hexdigest()
+                count += 1
+    except OSError as exc:
+        return ChainResult(False, count, count, f"read error: {exc.__class__.__name__}")
+    return ChainResult(True, count)

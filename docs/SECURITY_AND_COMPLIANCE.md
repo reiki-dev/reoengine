@@ -67,8 +67,11 @@ service by ReOEngine itself; ReOEngine has no telemetry and no phone-home.
 | `state/task-outcomes.jsonl` | Written only when a human runs `approve` |
 
 The event log only grows during an agent call (the guard compares the old prefix before and
-after). It is **not signed and not tamper-evident** against someone with write access to the host:
-for evidentiary use, ship these files to write-once storage.
+after). New lines form a SHA-256 hash chain; `reoengine verify RUN_ID` detects accidental or
+partial tampering such as editing, deleting, or reordering an earlier line. This does not prove who
+wrote an event and does not stop an attacker who can rewrite the whole file and recompute the
+chain. A future version may anchor the head hash in `result.json`; for evidentiary use, ship these
+files to write-once storage.
 
 ## 4. What leaves the machine
 

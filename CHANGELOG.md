@@ -5,6 +5,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- SHA-256 event-log chains and the read-only `verify RUN_ID` command.
 - CLI review commands: `list`, `show`, `export`, `apply`, and `roles`, with findings and diffstat at human review.
 - Complete example project, task, and plan; offline hello-world demo; Python and Node profiles.
 - `tune` command (the former `preflight`, which remains as a deprecated alias).

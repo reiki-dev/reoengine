@@ -13,7 +13,7 @@ directories (`--runs-dir`, `--state-dir`, `REOENGINE_RUNS_DIR`, `REOENGINE_STATE
 | `task.json`, `plan.json`, `research.json` | brief, plan, research | The validated task, the plan (yours or the architect's), the researcher's output |
 | `state.json` | every stage | Current stage, status, attempt, `base_sha`, `head_sha`, input and output hashes, fix-loop progress markers |
 | `checkpoints/STAGE-ATTEMPT.json` | every stage | The validated output of each stage and attempt; later stages read these, not memory |
-| `events.jsonl` | every stage and agent call | One JSON line per event: stage start and end, agent call, role, engine, model, exit code, duration, input and output hashes, categories of failures. No prompts, no responses, no file names of protected paths |
+| `events.jsonl` | every stage and agent call | One JSON line per event: stage start and end, agent call, role, engine, model, exit code, duration, input and output hashes, categories of failures. New records include a zero-based `seq` and `prev`, the SHA-256 of the exact previous line bytes (without newline); the first record uses 64 zeroes. Legacy unchained lines may prefix a chain. `reoengine verify RUN_ID` checks it. No prompts, no responses, no file names of protected paths |
 | `prompts/STAGE-ATTEMPT-ROLE.txt` | every agent call | The exact prompt text sent |
 | `gates.json` | gates | Each check: name, argv outcome class (`pass`, `assertion_failed`, `infra_error`, `timeout`, `unknown`), exit code, bounded output tails, and the isolation level used (`env-only` or `wrapper`) |
 | `feedback.json` | fix loop | The sanitized, bounded failure tails and review findings handed to the coder as data |

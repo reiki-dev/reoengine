@@ -622,7 +622,7 @@ class StateAndLogTests(TemporaryTest):
         self.assertEqual(len(records), 2)
         self.assertEqual(records[0]["input_hash"], hashlib.sha256(self.payload).hexdigest())
         self.assertNotIn("Кириллица", log.path.read_text(encoding="utf-8"))
-        self.assertEqual(set(records[0]), {"ts","run_id","stage","role","model","engine","exit_code","duration_ms","input_hash","output_hash","limit_remaining","event"})
+        self.assertEqual(set(records[0]), {"ts","run_id","stage","role","model","engine","exit_code","duration_ms","input_hash","output_hash","limit_remaining","event","seq","prev"})
 
     def usage_record(self, when: datetime) -> UsageRecord:
         return UsageRecord("test", Stage.IMPLEMENT, "coder", Engine.CODEX, "synthetic", Effort.HIGH,

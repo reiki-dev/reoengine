@@ -19,7 +19,7 @@ from .adapters.codex import codex_rate_limits
 from .config import (Configuration, Effort, Engine, RoleConfig, effective_roles,
                      load_configuration)
 from .doctor import Probe, diagnose
-from .events import Event, EventKind, EventLog, LimitRemaining
+from .events import Event, EventKind, EventLog, LimitRemaining, verify_chain
 from .factory import make_adapters
 from .fsm import Pipeline, RunInputs, StageError
 from .gc import collect_failures, collect_run_links, usage_size_warnings
@@ -63,6 +63,8 @@ def parser() -> argparse.ArgumentParser:
     listing.add_argument("--limit", type=int, default=20)
     show = commands.add_parser("show", help="Show run review details")
     show.add_argument("run_id")
+    verify = commands.add_parser("verify", help="Verify a run event log chain")
+    verify.add_argument("run_id")
     export = commands.add_parser("export", help="Export shareable run artifacts")
     export.add_argument("run_id")
     export.add_argument("--output")
@@ -219,7 +221,27 @@ def main(argv: Sequence[str] | None = None, *, adapters: Mapping[Engine, Adapter
                                    probe=doctor_probe, roles_file=roles_file)
             for diagnostic in diagnostics:
                 print(diagnostic.render(), file=output)
+            recent: list[tuple[int, Path]] = []
+            if dirs.runs.is_dir():
+                for path in dirs.runs.glob("*/events.jsonl"):
+                    try:
+                        recent.append((path.stat().st_mtime_ns, path))
+                    except OSError:
+                        continue
+            for _, path in sorted(recent, reverse=True)[:20]:
+                result = verify_chain(path)
+                if not result.ok:
+                    print(f"warning: event chain: {path.parent.name}: line {result.index}: {result.reason}",
+                          file=output)
             return 1 if any(diagnostic.level == "error" for diagnostic in diagnostics) else 0
+        if command == "verify":
+            run_directory = _run_path(dirs.runs, args.get("run_id"))
+            result = verify_chain(run_directory / "events.jsonl")
+            if result.ok:
+                print(f"ok {result.events} events", file=output)
+                return 0
+            print(f"break at event {result.index}: {result.reason}", file=output)
+            return 1
         if command == "gc":
             print(f"Removed expired failure artifacts: {collect_failures(dirs.runs, now=now)}", file=output)
             print(f"Removed completed run links: {collect_run_links(dirs.runs)}", file=output)
