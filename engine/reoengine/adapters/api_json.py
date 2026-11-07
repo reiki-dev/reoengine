@@ -6,9 +6,12 @@ import os
 import socket
 import time
 import uuid
+import threading
+from queue import Queue
 from collections.abc import Mapping
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Callable
 
@@ -62,6 +65,13 @@ class ApiJsonAdapter:
             definition = _schema_value(schema) if schema is not None else None
             payload = _request_payload(self.engine, role_cfg, prompt, definition)
             url, headers = _request_target(self.engine, role_cfg, key)
+            if role_cfg.base_url is not None:
+                parsed = urlsplit(role_cfg.base_url)
+                host = (parsed.hostname or "").lower()
+                loopback = host in {"127.0.0.1", "localhost", "::1"}
+                if (parsed.scheme != "https" and not (parsed.scheme == "http" and loopback)) or \
+                        not host or parsed.username is not None or parsed.password is not None or parsed.fragment:
+                    raise ValueError("Unsafe API base URL")
             body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         except (OSError, ValueError, UnicodeError):
             return AgentResult(-1, "", TokenUsage(), time.monotonic() - started, None,
@@ -77,25 +87,49 @@ class ApiJsonAdapter:
                 return _result(-1, time.monotonic() - started, None, TokenUsage(),
                                ErrorKind.TIMEOUT, "", role_cfg.note, key)
             request = urllib.request.Request(url, data=body, headers=headers, method="POST")
-            try:
-                with _OPENER.open(request, timeout=remaining) as response:
-                    status = response.status
-                    response_body = response.read(_MAX_RESPONSE + 1)
-            except urllib.error.HTTPError as exc:
-                status = exc.code
-                response_body = exc.read(_MAX_RESPONSE + 1)
-            except (TimeoutError, socket.timeout):
+            result_queue: Queue[tuple[int, bytes] | BaseException] = Queue(maxsize=1)
+            response_holder: list[object] = []
+            def perform_request() -> None:
+                try:
+                    try:
+                        response = _OPENER.open(request, timeout=max(0.001, remaining))
+                        response_holder.append(response)
+                        with response:
+                            result_queue.put((response.status, response.read(_MAX_RESPONSE + 1)))
+                    except urllib.error.HTTPError as exc:
+                        response_holder.append(exc)
+                        with exc:
+                            result_queue.put((exc.code, exc.read(_MAX_RESPONSE + 1)))
+                except BaseException as exc:
+                    result_queue.put(exc)
+            worker = threading.Thread(target=perform_request, daemon=True)
+            worker.start()
+            worker.join(max(0.0, remaining))
+            if worker.is_alive():
+                for response in response_holder:
+                    def close_response(value: object = response) -> None:
+                        try:
+                            value.close()  # type: ignore[attr-defined]
+                        except (AttributeError, OSError):
+                            pass
+                    threading.Thread(target=close_response, daemon=True).start()
                 return _result(-1, time.monotonic() - started, None, TokenUsage(),
                                ErrorKind.TIMEOUT, "", role_cfg.note, key)
-            except urllib.error.URLError as exc:
-                if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-                    return _result(-1, time.monotonic() - started, None, TokenUsage(),
-                                   ErrorKind.TIMEOUT, "", role_cfg.note, key)
-                return _result(-1, time.monotonic() - started, None, TokenUsage(),
-                               ErrorKind.PROCESS, "", role_cfg.note, key)
-            except (OSError, ValueError):
-                return _result(-1, time.monotonic() - started, None, TokenUsage(),
-                               ErrorKind.PROCESS, "", role_cfg.note, key)
+            response_result = result_queue.get()
+            if isinstance(response_result, BaseException):
+                exc = response_result
+                if isinstance(exc, urllib.error.HTTPError):
+                    status = exc.code
+                    response_body = exc.read(_MAX_RESPONSE + 1)
+                elif isinstance(exc, (TimeoutError, socket.timeout)):
+                    return _result(-1, time.monotonic() - started, None, TokenUsage(), ErrorKind.TIMEOUT, "", role_cfg.note, key)
+                elif isinstance(exc, urllib.error.URLError):
+                    kind = ErrorKind.TIMEOUT if isinstance(exc.reason, (TimeoutError, socket.timeout)) else ErrorKind.PROCESS
+                    return _result(-1, time.monotonic() - started, None, TokenUsage(), kind, "", role_cfg.note, key)
+                else:
+                    return _result(-1, time.monotonic() - started, None, TokenUsage(), ErrorKind.PROCESS, "", role_cfg.note, key)
+            else:
+                status, response_body = response_result
             if len(response_body) > _MAX_RESPONSE:
                 return _result(status, time.monotonic() - started, None, TokenUsage(),
                                ErrorKind.SCHEMA, "response exceeded 8 MB", role_cfg.note, key)
@@ -199,6 +233,8 @@ def _extract(engine: Engine, data: dict[str, Json]) -> tuple[str, TokenUsage]:
         if not isinstance(candidates, list) or not candidates:
             raise ValueError("Gemini returned no candidates")
         candidate = object_value(candidates[0], "candidate")
+        if candidate.get("finishReason") not in (None, "STOP"):
+            raise ValueError("Gemini response incomplete")
         content = object_value(candidate.get("content"), "candidate content")
         parts = content.get("parts")
         if not isinstance(parts, list):
@@ -217,6 +253,8 @@ def _extract(engine: Engine, data: dict[str, Json]) -> tuple[str, TokenUsage]:
                                           _int_or_none(usage, "thoughtsTokenCount"))
     usage_data = object_value(data.get("usage", {}), "usage")
     if engine == Engine.ANTHROPIC:
+        if data.get("stop_reason") == "max_tokens":
+            raise ValueError("Anthropic response incomplete")
         blocks = data.get("content")
         if not isinstance(blocks, list):
             raise ValueError("Anthropic response has no content")
@@ -229,6 +267,8 @@ def _extract(engine: Engine, data: dict[str, Json]) -> tuple[str, TokenUsage]:
         return answer, TokenUsage(_int_or_none(usage_data, "input_tokens"),
                                   _int_or_none(usage_data, "cache_read_input_tokens"),
                                   _int_or_none(usage_data, "output_tokens"))
+    if data.get("status") == "incomplete":
+        raise ValueError("OpenAI response incomplete")
     output_text = data.get("output_text")
     if isinstance(output_text, str) and output_text:
         answer = output_text

@@ -103,12 +103,14 @@ class ProcessResult:
     kill_tree_incomplete: bool = False
 
 
-def resolve_executable(executable: str, env: Mapping[str, str] | None = None) -> str:
+def resolve_executable(executable: str, env: Mapping[str, str] | None = None,
+                       cwd: Path | None = None) -> str:
     environment = os.environ if env is None else env
     path = Path(executable)
     extensions = environment.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if os.name == "nt" else []
     if path.is_absolute() or os.path.dirname(executable):
-        for candidate in [path, *(Path(str(path) + ext) for ext in extensions if not path.suffix)]:
+        base = path if path.is_absolute() or cwd is None else cwd / path
+        for candidate in [base, *(Path(str(base) + ext) for ext in extensions if not path.suffix)]:
             if candidate.is_file():
                 return str(candidate.resolve())
         raise FileNotFoundError(f"Executable not found: {executable}")
@@ -138,10 +140,11 @@ def _batch_quote(argument: str) -> str:
     return '"' + argument + "\\" * trailing + '"'
 
 
-def command_line(argv: Sequence[str], env: Mapping[str, str] | None = None) -> list[str]:
+def command_line(argv: Sequence[str], env: Mapping[str, str] | None = None,
+                 cwd: Path | None = None) -> list[str]:
     if not argv:
         raise ValueError("Empty command")
-    executable = resolve_executable(argv[0], env)
+    executable = resolve_executable(argv[0], env, cwd)
     if Path(executable).suffix.lower() in {".cmd", ".bat"}:
         if os.name != "nt":
             raise OSError("Batch files require Windows")
@@ -282,12 +285,14 @@ def run_process(
         launch_env = dict(os.environ if env is None else env)
         process_token = uuid.uuid4().hex
         launch_env["REOENGINE_PROCESS_TOKEN"] = process_token
-    command = command_line(argv, launch_env)
+    command = command_line(argv, launch_env, cwd)
     source: BinaryIO | None = stdin_file.open("rb") if stdin_file is not None else None
     started = time.monotonic()
     tails = [bytearray(), bytearray()]
     errors: list[BaseException] = []
+    reader_failed = threading.Event()
     job: _WindowsJob | None = None
+    process_cleaned = False
 
     def drain(stream: BinaryIO, index: int) -> None:
         try:
@@ -301,6 +306,7 @@ def run_process(
                     del tails[index][:len(tails[index]) - tail_bytes]
         except BaseException as exc:
             errors.append(exc)
+            reader_failed.set()
         finally:
             stream.close()
 
@@ -322,6 +328,7 @@ def run_process(
             except BaseException:
                 process.kill()
                 process.wait()
+                process_cleaned = True
                 for stream in (process.stdout, process.stderr, process.stdin):
                     if stream is not None:
                         stream.close()
@@ -360,6 +367,9 @@ def run_process(
         deadline = started + timeout
         try:
             while True:
+                if reader_failed.is_set():
+                    kill_tree_incomplete = _kill_tree(process, job, process_token)
+                    break
                 if stop_event is not None and stop_event.is_set():
                     kill_tree_incomplete = _kill_tree(process, job, process_token)
                     break
@@ -367,11 +377,12 @@ def run_process(
                 if remaining <= 0:
                     raise subprocess.TimeoutExpired(command, timeout)
                 try:
-                    process.wait(timeout=min(0.05, remaining) if stop_event is not None else remaining)
+                    process.wait(timeout=min(0.05, remaining))
                     break
                 except subprocess.TimeoutExpired:
-                    if stop_event is None:
-                        raise
+                    continue
+            if os.name == "posix" and process.poll() is not None and not reader_failed.is_set():
+                kill_tree_incomplete = _kill_tree(process, job, process_token) or kill_tree_incomplete
             # A child may inherit stdout even after its parent exits.
             for reader in readers:
                 reader.join(max(0.0, deadline - time.monotonic()))
@@ -381,7 +392,7 @@ def run_process(
             timed_out = True
             kill_tree_incomplete = _kill_tree(process, job, process_token)
         for reader in readers:
-            reader.join(10)
+            reader.join(2)
         writer.join(10)
         if errors:
             raise RuntimeError("Process output reader failed") from errors[0]
@@ -389,6 +400,13 @@ def run_process(
             raise RuntimeError("Process tree did not close output pipes")
         return ProcessResult(process.returncode, _decode_tail(tails[0], tail_bytes), _decode_tail(tails[1], tail_bytes),
                              time.monotonic() - started, timed_out, kill_tree_incomplete)
+    except BaseException:
+        if "process" in locals() and not process_cleaned:
+            try:
+                _kill_tree(process, job, process_token)
+            except BaseException:
+                pass
+        raise
     finally:
         if job is not None:
             job.close()

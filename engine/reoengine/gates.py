@@ -319,7 +319,13 @@ def _execute(name: str, argv: Sequence[str], cwd: Path, request: GateRequest) ->
                 if token == "{worktree}":
                     wrapper.append(str(cwd))
                 elif re.fullmatch(r"\{link:[A-Za-z0-9_.-]+\}", token):
-                    wrapper.append(str(cwd / token[6:-1]))
+                    name = token[6:-1]
+                    if name in {".", ".."}:
+                        raise ValueError("Invalid isolation wrapper link name")
+                    link = (cwd / name).resolve()
+                    if not link.is_relative_to(cwd.resolve()):
+                        raise ValueError("Isolation wrapper link escapes worktree")
+                    wrapper.append(str(link))
                 elif "{" in token or "}" in token:
                     raise ValueError("Unknown isolation wrapper placeholder")
                 else:

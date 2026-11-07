@@ -131,7 +131,8 @@ class GuardTests(SyntheticTest):
     def test_engine_appends_events_during_agent_call(self) -> None:
         fake = WritingAdapter(lambda: pipeline.events.append(Event("run", EventKind.RATE_LIMITS_UNAVAILABLE)))
         pipeline = self.pipeline(fake)
-        self.assertEqual(pipeline.start(make_inputs(tdd=False)).status, Status.AWAITING_HUMAN)
+        self.assertEqual(pipeline.start(make_inputs(tdd=False)).status, Status.FAILED)
+        self.assertTrue(self.events("outside_write_detected"))
 
     def test_git_unavailable_fails_before_or_after_call(self) -> None:
         real_snapshot = source_snapshot
@@ -279,7 +280,7 @@ class GuardTests(SyntheticTest):
         self.assertIn(b'"event":"outside_write_detected"', pipeline.events.path.read_bytes())
         self.assertFalse(pipeline.events.path.with_suffix(".jsonl.corrupt").exists())
 
-    def test_event_growth_while_snapshot_is_taken_is_allowed(self) -> None:
+    def test_event_growth_while_snapshot_is_taken_is_detected(self) -> None:
         pipeline = self.pipeline()
         pipeline.directory.mkdir(parents=True, exist_ok=True)
         pipeline.events.path.write_bytes(b'{"synthetic":"before"}\n')
@@ -298,7 +299,7 @@ class GuardTests(SyntheticTest):
         with patch.object(Path, "lstat", concurrent_append):
             before = pipeline.guard.snapshot()
         self.assertTrue(appended)
-        self.assertEqual(pipeline.guard.compare(before, pipeline.guard.snapshot()), ())
+        self.assertTrue(pipeline.guard.compare(before, pipeline.guard.snapshot()))
 
 
 class DigestSchemaTests(SyntheticTest):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import unittest
 from collections.abc import Callable, Iterator, Sequence
@@ -36,7 +37,8 @@ class GitMetadataTests(SyntheticTest):
             "config": lambda: git_command(self.repo, "config", "--local", "reoengine.synthetic", "changed"),
             "existing-hook": lambda: hook.write_text("synthetic replacement", encoding="utf-8"),
             "new-hook": (gitdir / "hooks/synthetic-new").touch,
-            "exclude": lambda: self.bump(gitdir / "info/exclude"),
+            "exclude": lambda: (gitdir / "info/exclude").write_bytes(
+                (gitdir / "info/exclude").read_bytes() + b"synthetic-change\n"),
             "tag": lambda: git_command(self.repo, "tag", "synthetic-tag"),
             "branch": lambda: git_command(self.repo, "branch", "synthetic-branch"),
             # Same commit, different symbolic HEAD: head() alone cannot see this.
@@ -68,6 +70,7 @@ class GitMetadataTests(SyntheticTest):
     def test_all_service_roots_and_recursive_entries_are_metadata_only(self) -> None:
         gitdir = self.repo / ".git"
         git_command(self.repo, "pack-refs", "--all")
+        git_command(self.repo, "branch", "synthetic-head-target")
         names = ("config", "config.worktree", "HEAD", "packed-refs", "info/exclude",
                  "info/attributes", "info/nested/fixture", "hooks/nested/fixture",
                  "refs/heads/nested/fixture", "refs/tags/nested/fixture")
@@ -77,15 +80,23 @@ class GitMetadataTests(SyntheticTest):
             if not path.exists():
                 path.touch()
         source = self.pipeline().source
-        with patch.object(Path, "open", side_effect=AssertionError("source content read")):
-            before = source_snapshot(source)
-            assert before is not None
-            for name in names:
-                with self.subTest(name=name):
-                    path = gitdir / name
-                    info = path.lstat()
-                    self.assertEqual(before.paths["gitdir:common/" + name],
-                                     f"metadata:{info.st_mode}:{info.st_size}:{info.st_mtime_ns}")
+        before = source_snapshot(source)
+        assert before is not None
+        for name in names:
+            with self.subTest(name=name):
+                path = gitdir / name
+                info = path.lstat()
+                content_hashed = (name in {"config", "config.worktree", "HEAD", "packed-refs",
+                                           "info/exclude", "info/attributes"}
+                                  and info.st_size <= 1_048_576)
+                if name.startswith("hooks/") and "/" not in name[len("hooks/"):]:
+                    content_hashed = info.st_size <= 1_048_576
+                if name.startswith("info/") and "/" not in name[len("info/"):]:
+                    content_hashed = info.st_size <= 1_048_576
+                expected = ("sha256:" + hashlib.sha256(path.read_bytes()).hexdigest() if content_hashed
+                            else f"metadata:{info.st_mode}:{info.st_size}:{info.st_mtime_ns}")
+                self.assertEqual(before.paths["gitdir:common/" + name], expected)
+                if not content_hashed:
                     self.bump(path)
                     after = source_snapshot(source)
                     self.assertIsNotNone(after)
@@ -159,12 +170,15 @@ class GitMetadataTests(SyntheticTest):
         self.assertIn("gitdir:common/config", snapshot.source.paths)
         self.assertIn("gitdir:private/HEAD", snapshot.source.paths)
         self.assert_change(guard, lambda: guard.source.command(("config", "--local", "reoengine.synthetic", "changed")))
-        self.assert_change(guard, lambda: self.bump(personal / "HEAD"))
+        self.assert_change(guard, lambda: (personal / "HEAD").write_bytes(b"ref: refs/heads/master\n"))
         for name in ("config.worktree", "info/nested/fixture", "hooks/nested/fixture"):
             path = personal / name
             path.parent.mkdir(parents=True, exist_ok=True)
             self.assert_change(guard, path.touch)
-            self.assert_change(guard, lambda: self.bump(path))
+            if name == "config.worktree":
+                self.assert_change(guard, lambda: path.write_bytes(b"changed\n"))
+            else:
+                self.assert_change(guard, lambda: self.bump(path))
         before = guard.snapshot()
         self.bump(personal / "index")
         self.assertEqual(guard.compare(before, guard.snapshot()), ())

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import Any
@@ -12,6 +13,7 @@ class ScriptedHttpServer:
         self.responses = list(responses)
         self.requests: list[dict[str, Any]] = []
         self.redirect_to: str | None = None
+        self.slow_drip = False
         server = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -27,7 +29,16 @@ class ScriptedHttpServer:
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                if server.slow_drip:
+                    for byte in body:
+                        try:
+                            self.wfile.write(bytes((byte,)))
+                            self.wfile.flush()
+                            time.sleep(0.2)
+                        except (BrokenPipeError, ConnectionResetError):
+                            break
+                else:
+                    self.wfile.write(body)
 
             def do_GET(self) -> None:
                 server.requests.append({"method": "GET", "path": self.path, "headers": dict(self.headers.items())})
@@ -40,6 +51,8 @@ class ScriptedHttpServer:
                 return
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.daemon_threads = True
+        self.server.block_on_close = False
         self.thread = Thread(target=self.server.serve_forever, daemon=True)
 
     @property

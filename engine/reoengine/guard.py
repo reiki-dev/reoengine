@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -19,18 +20,40 @@ from .runlinks import run_link_names
 Category = Literal["engine_state", "config", "source_repo", "state_dir"]
 # Shared by ignored working-tree entries and persistent Git metadata entries.
 MAX_IGNORED_ENTRIES = 200_000
+MAX_COLLECT_ENTRIES = 100_000
+COLLECT_DEADLINE_SECONDS = 30.0
+MAX_GIT_CONTENT_BYTES = 1_048_576
 
 
-def _hash(path: Path, limit: int | None = None) -> str:
+def _hash(path: Path, limit: int | None = None, deadline: float | None = None) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         while limit is None or limit > 0:
+            if deadline is not None and time.monotonic() > deadline:
+                raise ValueError("Snapshot collection deadline exceeded")
             chunk = stream.read(65536 if limit is None else min(65536, limit))
             if not chunk:
                 break
             digest.update(chunk)
             if limit is not None:
                 limit -= len(chunk)
+    return digest.hexdigest()
+
+
+def _hash_git_file(path: Path, limit: int) -> str:
+    """Hash explicitly allowlisted Git control metadata without Path.open()."""
+    digest = hashlib.sha256()
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+    try:
+        remaining = limit
+        while remaining:
+            chunk = os.read(fd, min(65536, remaining))
+            if not chunk:
+                break
+            digest.update(chunk)
+            remaining -= len(chunk)
+    finally:
+        os.close(fd)
     return digest.hexdigest()
 
 
@@ -46,7 +69,12 @@ def _linked(info: os.stat_result) -> bool:
     return stat.S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & 0x400)
 
 
-def _collect(path: Path, root: Path, files: dict[str, str]) -> None:
+def _collect(path: Path, root: Path, files: dict[str, str], budget: list[int] | None = None,
+             deadline: float | None = None) -> None:
+    if budget is not None:
+        budget[0] += 1
+        if budget[0] > MAX_COLLECT_ENTRIES or (deadline is not None and time.monotonic() > deadline):
+            raise ValueError("Snapshot collection limit exceeded")
     try:
         info = path.lstat()
     except FileNotFoundError:
@@ -56,10 +84,17 @@ def _collect(path: Path, root: Path, files: dict[str, str]) -> None:
         # Do not follow junctions/symlinks or open secret/data files.
         files[name] = "metadata:" + _metadata(path)
     elif stat.S_ISDIR(info.st_mode):
-        for child in sorted(path.iterdir()):
-            _collect(child, root, files)
+        children: list[Path] = []
+        with os.scandir(path) as entries:
+            for entry in entries:
+                if budget is not None and (budget[0] + len(children) + 1 > MAX_COLLECT_ENTRIES or
+                                           (deadline is not None and time.monotonic() > deadline)):
+                    raise ValueError("Snapshot collection limit exceeded")
+                children.append(path / entry.name)
+        for child in sorted(children):
+            _collect(child, root, files, budget, deadline)
     else:
-        files[name] = "sha256:" + _hash(path)
+        files[name] = "sha256:" + _hash(path, deadline=deadline)
 
 
 @dataclass(frozen=True)
@@ -128,7 +163,44 @@ def _git_metadata(git: Git, paths: dict[str, str], budget: int) -> int:
             count += _metadata_tree(root, prefix, paths, budget - count, git_metadata=True)
             continue
         for name in names:
-            count += _metadata_tree(root / name, prefix + name, paths, budget - count,
+            target = root / name
+            if name in {"config", "config.worktree", "HEAD", "packed-refs"}:
+                try:
+                    info = target.lstat()
+                    if stat.S_ISREG(info.st_mode) and not _linked(info) and info.st_size <= MAX_GIT_CONTENT_BYTES:
+                        paths[prefix + name] = "sha256:" + _hash_git_file(target, MAX_GIT_CONTENT_BYTES)
+                        count += 1
+                        continue
+                except OSError:
+                    pass
+            if name in {"hooks", "info"}:
+                count += 1
+                if count > budget:
+                    raise ValueError("Metadata entry limit exceeded")
+                try:
+                    directory_info = target.lstat()
+                    if stat.S_ISDIR(directory_info.st_mode) and not _linked(directory_info):
+                        paths[prefix + name] = f"metadata:directory:{directory_info.st_mode}"
+                        with os.scandir(target) as entries:
+                            for entry in entries:
+                                if entry.name.endswith(".lock"):
+                                    continue
+                                child = target / entry.name
+                                child_name = prefix + name + "/" + entry.name
+                                info = child.lstat()
+                                if stat.S_ISREG(info.st_mode) and not _linked(info) and info.st_size <= MAX_GIT_CONTENT_BYTES:
+                                    count += 1
+                                    if count > budget:
+                                        raise ValueError("Metadata entry limit exceeded")
+                                    paths[child_name] = "sha256:" + _hash_git_file(child, MAX_GIT_CONTENT_BYTES)
+                                else:
+                                    count += _metadata_tree(child, child_name, paths, budget - count,
+                                                            git_metadata=True)
+                        continue
+                except FileNotFoundError:
+                    paths[prefix + name] = "metadata:missing"
+                    continue
+            count += _metadata_tree(target, prefix + name, paths, budget - count,
                                     git_metadata=True)
     return count
 
@@ -210,17 +282,22 @@ class OutsideGuard:
     def snapshot(self) -> Snapshot:
         files: dict[Category, dict[str, str]] = {"engine_state": {}, "config": {}, "state_dir": {}}
         category: Category = "engine_state"
+        budget = [0]
+        deadline = time.monotonic() + COLLECT_DEADLINE_SECONDS
         try:
             for name in ("state.json", "inputs.json", "task.json", "plan.json", "launch.json",
                          "checkpoints", "gates.json", "review", "run-links.json"):
-                _collect(self.run / name, self.run, files[category])
+                _collect(self.run / name, self.run, files[category], budget, deadline)
             for name in run_link_names(self.run):
+                budget[0] += 1
+                if budget[0] > MAX_COLLECT_ENTRIES or time.monotonic() > deadline:
+                    raise ValueError("Snapshot collection limit exceeded")
                 files[category]["run-link:" + name] = _metadata(self.run / name)
             category = "config"
-            _collect(self.config, self.config, files[category])
+            _collect(self.config, self.config, files[category], budget, deadline)
             category = "state_dir"
             for name in ("overrides.json", "tuning.json", "tuning-log.jsonl"):
-                _collect(self.state / name, self.state, files[category])
+                _collect(self.state / name, self.state, files[category], budget, deadline)
         except (OSError, ValueError):
             raise SnapshotError(category) from None
         events = self.run / "events.jsonl"
@@ -248,10 +325,10 @@ class OutsideGuard:
         violations: list[Violation] = []
         for category in ("engine_state", "config", "state_dir"):
             count = _changed(before.files[category], after.files[category])
-            if category == "engine_state" and before.events_size is not None:
+            if category == "engine_state":
                 try:
-                    preserved = (after.events_size is not None and after.events_size >= before.events_size
-                                 and _hash(self.run / "events.jsonl", before.events_size) == before.events_hash)
+                    preserved = (after.events_size == before.events_size
+                                 and after.events_hash == before.events_hash)
                 except OSError:
                     preserved = False
                 if not preserved:

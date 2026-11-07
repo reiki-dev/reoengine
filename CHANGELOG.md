@@ -4,6 +4,9 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Security
+- Tightened process cleanup, executable path resolution, outside-write snapshots, wrapper link validation, and API request URL/deadline/response-completion checks; documented guard, isolation, gate, redaction, and POST retry limits.
+
 ### Added
 - SHA-256 event-log chains and the read-only `verify RUN_ID` command.
 - CLI review commands: `list`, `show`, `export`, `apply`, and `roles`, with findings and diffstat at human review.

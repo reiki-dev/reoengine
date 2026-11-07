@@ -66,8 +66,10 @@ service by ReOEngine itself; ReOEngine has no telemetry and no phone-home.
 | `state/usage-YYYY-MM.jsonl` | One record per agent call: tokens, cost (with `cost_source`: reported by the CLI, computed from your `pricing.toml`, or unknown) |
 | `state/task-outcomes.jsonl` | Written only when a human runs `approve` |
 
-The event log only grows during an agent call (the guard compares the old prefix before and
-after). New lines form a SHA-256 hash chain; `reoengine verify RUN_ID` detects accidental or
+The engine does not append events during an agent call. The outside-write guard requires
+`events.jsonl` to have identical size and SHA-256 before and after each call; an appended line is
+an outside write. New lines written by the engine between calls form a SHA-256 hash chain;
+`reoengine verify RUN_ID` detects accidental or
 partial tampering such as editing, deleting, or reordering an earlier line. This does not prove who
 wrote an event and does not stop an attacker who can rewrite the whole file and recompute the
 chain. A future version may anchor the head hash in `result.json`; for evidentiary use, ship these
@@ -102,6 +104,25 @@ vendor in `config/roles.toml`.
 | Human gate | The only way to finish a run | The engine cannot stop a human from approving carelessly |
 | Fix-loop limits | At most `max_fix_rounds` rounds, a token budget, and a stop when two rounds make no progress; the reason is in `result.json` | Limits cost and loops, not correctness |
 | Process cleanup | On timeout the whole process tree is killed (process groups, descendant walk, environment token on Linux, Job Objects on Windows) | A process that escapes via an unusual mechanism may survive; the engine reports `kill_tree_incomplete` when it can tell |
+
+The outside-write guard monitors the selected run files (`state.json`, `inputs.json`, `task.json`,
+`plan.json`, `launch.json`, `checkpoints/`, `gates.json`, `review/`, `run-links.json`, and named
+run links), the configured config directory, `state/overrides.json`, `state/tuning.json`,
+`state/tuning-log.jsonl`, and Git status plus persistent metadata in the source repository. It
+hashes ordinary config/state files and Git `config`, `config.worktree`, `HEAD`, `packed-refs`, and
+regular hook/info files up to 1 MiB. Ignored files, Git refs, secret-named files, links, and other
+Git metadata are metadata-only (type, size, and modification time); those values can be forged by
+an actor able to restore metadata. Source file contents are intentionally never opened.
+
+On POSIX, process cleanup is best effort and does not use cgroups. Hostile descendants may escape
+with `setsid`, scrub the process token from their environment, or double-fork; cleanup cannot
+guarantee their termination.
+
+The TDD red/green gate is evidence that checks failed and then passed with assertion-like output;
+it does not prove the checks are meaningful regression tests. Secret redaction in feedback and
+exports uses best-effort pattern matching. Infrastructure-versus-assertion failure classification
+is heuristic. Retrying POST requests after selected 5xx statuses may cause a provider to bill more
+than once if it processed an earlier attempt.
 
 ## 6. Known limits (read before relying on this)
 
