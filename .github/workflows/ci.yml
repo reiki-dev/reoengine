@@ -1,0 +1,31 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install mypy
+      - name: Type check
+        working-directory: engine
+        run: python -m mypy --strict reona
+      - name: Unit tests
+        working-directory: engine
+        env:
+          # Avoid 8.3 short temp paths (RUNNER~1) that make path comparisons in tests unstable.
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: python -m unittest discover -s tests
+      - name: Check diff
+        run: git diff --check

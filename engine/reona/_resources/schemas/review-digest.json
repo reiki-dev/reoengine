@@ -1,0 +1,140 @@
+{
+  "type": "object",
+  "properties": {
+    "coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string"},
+          "reviewed": {"type": "boolean"},
+          "note": {"type": "string"}
+        },
+        "required": ["path", "reviewed", "note"],
+        "additionalProperties": false
+      }
+    },
+    "risk_tier": {
+      "type": "string",
+      "enum": ["normal", "high"],
+      "description": "Engine supplied; reader values are ignored."
+    },
+    "input_digest": {
+      "type": "string",
+      "description": "Engine supplied SHA-256 of the canonical review input."
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Engine supplied sorted diff paths."
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "satisfied": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "satisfied",
+          "evidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "suspicious": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "line",
+          "excerpt",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "stdout_tail": {
+            "type": "string"
+          },
+          "stderr_tail": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["pass", "assertion_failed", "infra_error", "timeout", "unknown"]
+          }
+        },
+        "required": [
+          "name",
+          "passed",
+          "exit_code",
+          "stdout_tail",
+          "stderr_tail",
+          "duration_ms",
+          "outcome"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "coverage",
+    "risk_tier",
+    "input_digest",
+    "changed_files",
+    "checklist",
+    "suspicious",
+    "checks",
+    "unknowns"
+  ],
+  "additionalProperties": false,
+  "title": "review-digest"
+}

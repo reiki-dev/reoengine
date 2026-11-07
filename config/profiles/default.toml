@@ -1,0 +1,6 @@
+skills = []
+max_skills = 8
+max_skill_tokens = 12000
+blocked_paths = [".env*", "*.db", "*.db-shm", "*.db-wal", "*.pem", "*.key", "secrets/**"]
+rules = "Make the smallest diff needed for the task. Do not read or modify secrets or data. Run only the specified checks. Do not touch files outside the allowed paths."
+checks = []

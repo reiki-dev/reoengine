@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "plan",
+  "type": "object",
+  "properties": {
+    "approach": {
+      "type": "string"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "role": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "role"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "allowed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_checks": {
+      "anyOf": [
+        {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$"}},
+        {"type": "array", "items": {"type": "array", "items": {"type": "string"}}}
+      ]
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "approach",
+    "steps",
+    "allowed_paths",
+    "acceptance_checks",
+    "risks"
+  ],
+  "additionalProperties": false,
+  "description": "Steps contain id, description and role (null when unspecified). Checks are trusted project IDs; legacy argv requires explicit pipeline opt-in."
+}

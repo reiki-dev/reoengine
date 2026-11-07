@@ -1,0 +1,27 @@
+[project]
+name = "reoengine"
+version = "0.1.0"
+description = "Offline-testable primitives for the Reona engine"
+requires-python = ">=3.11"
+dependencies = []
+license = { text = "Apache-2.0" }
+
+[project.scripts]
+reoengine = "reona.cli:main"
+reona = "reona.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["reona*"]
+
+[tool.setuptools.package-data]
+reona = ["_resources/*", "_resources/schemas/*.json"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+cache_dir = "engine/.mypy_cache"

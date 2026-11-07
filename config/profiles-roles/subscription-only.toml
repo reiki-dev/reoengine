@@ -1,0 +1,83 @@
+[roles.coder]
+engine = "codex"
+model = "gpt-6-luna"
+effort = "high"
+sandbox = "workspace-write"
+# Terra is documented for writing/visual/computer use, not for code.
+fallback = []
+
+[roles.reviewer]
+engine = "codex"
+model = "gpt-6-astra"
+effort = "high"
+sandbox = "read-only"
+fallback = ["gpt-6-luna"]
+
+[roles.researcher]
+engine = "agy"
+model = "gemini-3.8-flash"
+effort = "high"
+fallback = ["gpt-6-luna"]
+
+[roles.reader]
+engine = "agy"
+model = "gemini-3.8-flash"
+fallback = ["gpt-6-luna"]
+
+[roles.architect]
+engine = "claude"
+model = "opus"
+neutral_cwd = true
+
+[roles.orchestrator]
+engine = "claude"
+model = "opus"
+neutral_cwd = true
+
+[roles.tester]
+engine = "codex"
+model = "gpt-6-luna"
+effort = "high"
+sandbox = "workspace-write"
+fallback = ["gpt-6-luna"]
+
+[roles.writer]
+engine = "agy"
+model = "gemini-3.8-flash"
+fallback = ["gpt-6.1-terra"]
+
+[roles.analyst]
+engine = "codex"
+model = "gpt-6-luna"
+effort = "high"
+fallback = ["gemini-3.8-flash"]
+
+[roles.product]
+engine = "agy"
+model = "gemini-3.8-flash"
+fallback = ["gpt-6.1-terra"]
+
+[roles.designer]
+engine = "agy"
+model = "gemini-3.8-flash"
+fallback = ["gpt-6.1-terra"]
+
+[roles.security]
+engine = "codex"
+model = "gpt-6.1-terra"
+fallback = ["gpt-6-luna"]
+
+[roles.support]
+engine = "agy"
+model = "gemini-3.8-flash"
+fallback = ["gpt-6.1-terra"]
+
+[roles.legal]
+engine = "agy"
+model = "gemini-3.8-flash"
+fallback = ["gpt-6.1-terra"]
+
+[roles.release]
+engine = "codex"
+model = "gpt-6.1-terra"
+fallback = ["gpt-6-luna"]

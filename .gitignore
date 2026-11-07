@@ -1,0 +1,13 @@
+state/
+runs/
+__pycache__/
+*.pyc
+.mypy_cache/
+.env*
+*.db*
+*.sqlite*
+config/projects/*.local.toml
+*.egg-info/
+build/
+dist/
+.venv/

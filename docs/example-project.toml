@@ -1,0 +1,3 @@
+# Minimal project configuration example. Copy to config/projects/<name>.local.toml (git-ignored) and set EXAMPLE_REPO.
+repo = "${ENV:EXAMPLE_REPO}"
+profile = "default"

@@ -1,0 +1,6 @@
+RESPONSE FORMAT (strict; your response is parsed by a program):
+1. Complete all reasoning, code review, and schema validation silently BEFORE responding. None of this belongs in the response: no reasoning, phrases such as “Wait” or “Let me check”, task restatements, or quotations from this prompt.
+2. The response consists of exactly one line `<<<JSON_BEGIN>>>`, then one JSON object, then one line `<<<JSON_END>>>`. Nothing may appear before BEGIN or after END: no text, explanations, or code fences.
+3. JSON must be strict: use double quotes, no comments or trailing commas; within strings escape `"` as \" , newlines as \n, and backslashes as \\ (write Windows paths using `/`). Use only schema keys; no extra keys (additionalProperties: false).
+4. Before output, mentally verify that all required keys are present, types match (`line` is an integer), and the JSON is closed.
+5. If you cannot complete the task (no access or missing data), still return valid JSON matching the schema and put the reason in the schema field for unknowns/limitations; do not explain outside the JSON.

@@ -1,0 +1,29 @@
+max_slots = 8
+timeout_seconds = 600
+max_fix_rounds = 3
+fix_loop_token_budget = 400000
+fix_loop_no_progress_stop = true
+# TZ leaves these two magnitudes open; conservative initial values.
+max_prompt_bytes = 2097152
+review_full_diff_lines = 400
+failure_ttl_days = 7
+limit_threshold_percent = 80
+
+[timeouts]
+coder = 1800
+reader = 1200
+reviewer = 1200
+
+[slots]
+coder = 1
+reviewer = 1
+readers = 4
+council = 3
+
+[quota]
+exit_codes = [1, 3, 29, 429]
+stderr_patterns = ['\brate.?limit\b', '\bquota\b', 'usage limit', 'too many requests', 'QUOTA_EXHAUSTED', 'RESOURCE_EXHAUSTED']
+
+[isolation]
+mode = "env"
+wrapper = []

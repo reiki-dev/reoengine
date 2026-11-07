@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gates",
+  "type": "object",
+  "properties": {
+    "isolation": {
+      "type": "string",
+      "enum": ["env-only", "wrapper"]
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "stdout_tail": {
+            "type": "string"
+          },
+          "stderr_tail": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["pass", "assertion_failed", "infra_error", "timeout", "unknown"]
+          }
+        },
+        "required": [
+          "name",
+          "passed",
+          "exit_code",
+          "stdout_tail",
+          "stderr_tail",
+          "duration_ms",
+          "outcome"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "isolation",
+    "passed",
+    "checks"
+  ],
+  "additionalProperties": false
+}

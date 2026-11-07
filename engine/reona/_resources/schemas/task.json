@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "task",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "verification"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "allowed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_checks": {
+      "anyOf": [
+        {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$"}},
+        {"type": "array", "items": {"type": "array", "items": {"type": "string"}}}
+      ]
+    },
+    "tdd_gate": {
+      "type": "boolean"
+    },
+    "tdd_gate_reason": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string"
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "description",
+    "requirements",
+    "allowed_paths",
+    "acceptance_checks",
+    "tdd_gate",
+    "profile"
+  ],
+  "additionalProperties": false,
+  "description": "Acceptance checks are trusted project check IDs. Legacy argv arrays require explicit pipeline opt-in."
+}
