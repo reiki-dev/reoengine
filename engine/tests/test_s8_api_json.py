@@ -122,6 +122,26 @@ class ApiJsonTests(unittest.TestCase):
             result = ApiJsonAdapter(Engine.GEMINI).invoke(self.role(Engine.GEMINI, server.base_url), self.prompt, self.root, 5)
         self.assertNotIn(secret, result.final_message_path.read_text(encoding="utf-8"))
 
+    def test_gemini_key_is_absent_from_all_artifacts_after_error_and_success(self) -> None:
+        secret = "gemini-key-from-environment"
+        error_body = encoded({"error": f"provider rejected key {secret}"})
+        success_body = encoded({"candidates": [{"content": {"parts": [
+            {"text": f'{{"answer":"{secret}"}}'}]}}]})
+        with patch.dict(os.environ, {"GEMINI_API_KEY": secret}):
+            with ScriptedHttpServer([(400, error_body)]) as server:
+                failed = ApiJsonAdapter(Engine.GEMINI).invoke(
+                    self.role(Engine.GEMINI, server.base_url), self.prompt, self.root, 5)
+            self.assertEqual(failed.error, ErrorKind.PROCESS)
+            with ScriptedHttpServer([(200, success_body)]) as server:
+                succeeded = ApiJsonAdapter(Engine.GEMINI).invoke(
+                    self.role(Engine.GEMINI, server.base_url), self.prompt, self.root, 5)
+        self.assertTrue(succeeded.success)
+        self.assertNotIn(secret, repr(failed))
+        self.assertNotIn(secret, repr(succeeded))
+        for path in self.root.rglob("*"):
+            if path.is_file():
+                self.assertNotIn(secret, path.read_bytes().decode("utf-8", errors="replace"), str(path))
+
     def test_anthropic_and_openai_success_and_exhausted_quota(self) -> None:
         responses = {
             Engine.ANTHROPIC: {"content": [{"type": "tool_use", "input": {"answer": "ok"}}],

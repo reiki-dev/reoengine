@@ -232,10 +232,26 @@ class CLITests(TemporaryTest):
         records = UsageLog(self.root / "state").read_days()
         self.assertEqual([record.model for record in records], ["coder", "coder-alt"])
 
+    @staticmethod
+    def _data_from_call(call: object) -> dict[str, object]:
+        prompt = call.prompt
+        envelope = json.JSONDecoder().raw_decode(prompt.split("DATA_JSON:\n", 1)[1])[0]
+        return envelope["data"]
+
     def test_cli_generated_plan_and_research(self) -> None:
         self.assertEqual(self.cli(["run", "synthetic", "--task", str(self.root / "task.json"), "--research"]), 0,
                          self.err.getvalue())
         self.assertEqual([call.model for call in self.fake.calls], ["researcher", "architect", "coder", "reader", "reviewer"])
+        research = {"summary": "synthetic", "sources": [], "findings": [], "unknowns": []}
+        for call in self.fake.calls:
+            if call.model in ("architect", "coder"):
+                self.assertEqual(self._data_from_call(call)["research"], research)
+
+    def test_cli_omits_research_as_null_when_not_requested(self) -> None:
+        self.assertEqual(self.run_task(), 0, self.err.getvalue())
+        for call in self.fake.calls:
+            if call.model in ("architect", "coder"):
+                self.assertIsNone(self._data_from_call(call).get("research"))
 
     def test_process_dies_during_implement_and_cli_resumes(self) -> None:
         process = subprocess.run((sys.executable, str(ENGINE / "tests/fakes/cli_crash.py"), str(self.root)),
@@ -297,6 +313,17 @@ class CLITests(TemporaryTest):
             self.assertEqual(main(["preflight", "--summary"], out=self.out, err=self.err), 0)
         self.assertIn("no changes; insufficient data", self.out.getvalue())
         self.assertFalse((self.root / "s/tuning.json").exists())
+        self.out = io.StringIO()
+        self.err = io.StringIO()
+        self.assertEqual(main(["--config-dir", str(self.config), "--state-dir", str(self.root / "s"),
+                               "tune", "--summary"], out=self.out, err=self.err), 0)
+        self.assertIn("no changes; insufficient data", self.out.getvalue())
+        self.assertEqual(self.err.getvalue(), "")
+        self.out = io.StringIO()
+        self.err = io.StringIO()
+        self.assertEqual(main(["--config-dir", str(self.config), "--state-dir", str(self.root / "s"),
+                               "preflight", "--summary"], out=self.out, err=self.err), 0)
+        self.assertEqual(self.err.getvalue(), "warning: 'preflight' is deprecated, use 'tune'\n")
 
     def test_dirty_source_is_metadata_warning_and_never_copied(self) -> None:
         (self.repo / "unchanged.txt").write_text("PRIVATE_UNCOMMITTED_EDIT", encoding="utf-8")

@@ -50,7 +50,7 @@ class GatesFixMixin(StageContext):
             diff_digest = hashlib.sha256(diff_path.read_bytes() if diff_path.is_file() else b"").hexdigest()
             if self.config.limits.fix_loop_token_budget:
                 records = [record for record in self.usage.read_days() if record.run_id == self.state.run_id
-                           and record.role in {"coder", "fix"}]
+                           and record.role in {"coder"}]
                 tokens = sum((record.usage.input_tokens or 0) + (record.usage.output_tokens or 0)
                              for record in records)
                 if tokens > self.config.limits.fix_loop_token_budget:

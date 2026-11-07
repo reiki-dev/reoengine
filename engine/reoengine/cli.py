@@ -69,11 +69,16 @@ def parser() -> argparse.ArgumentParser:
     switch.add_argument("--engine", choices=[engine.value for engine in Engine])
     switch.add_argument("--reset", metavar="ROLE")
     switch.add_argument("--roles", help="Use a roles TOML file (relative to config directory or absolute)")
-    tuning = commands.add_parser("preflight")
+    tuning = commands.add_parser("tune", help="Tune resource limits from usage history")
     mode = tuning.add_mutually_exclusive_group()
     mode.add_argument("--apply", action="store_true")
     mode.add_argument("--dry-run", action="store_true")
     tuning.add_argument("--summary", action="store_true")
+    legacy_tuning = commands.add_parser("preflight", help=argparse.SUPPRESS)
+    legacy_mode = legacy_tuning.add_mutually_exclusive_group()
+    legacy_mode.add_argument("--apply", action="store_true")
+    legacy_mode.add_argument("--dry-run", action="store_true")
+    legacy_tuning.add_argument("--summary", action="store_true")
     commands.add_parser("gc")
     doctor = commands.add_parser("doctor")
     doctor.add_argument("--roles", help="Use a roles TOML file (relative to config directory or absolute)")
@@ -218,7 +223,9 @@ def main(argv: Sequence[str] | None = None, *, adapters: Mapping[Engine, Adapter
             return 0
         if command == "switch":
             return _switch(args, dirs, output)
-        if command == "preflight":
+        if command in ("tune", "preflight"):
+            if command == "preflight":
+                print("warning: 'preflight' is deprecated, use 'tune'", file=errors)
             for line in preflight(load_configuration(dirs.config), dirs.state, dirs.runs,
                                   apply=args.get("apply") is True, summary=args.get("summary") is True, now=now):
                 print(line, file=output)

@@ -44,6 +44,10 @@ Ready-made role sets are in `config/profiles-roles/`. Select one with `--roles F
 Runtime overrides (`reoengine switch ROLE MODEL`) are written to `state/overrides.json` and take
 effect from the next stage. Precedence: overrides, then tuning, then `roles.toml`.
 
+Use `reoengine tune` to review resource-limit adjustments inferred from usage history. Add
+`--apply` to write proposed changes, `--dry-run` to explicitly preview them, or `--summary` for a
+compact report. The old `preflight` command remains as a deprecated compatibility alias.
+
 ## `limits.toml`
 
 | Key | Default | Meaning |

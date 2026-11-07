@@ -106,6 +106,24 @@ class RoleProfileTests(unittest.TestCase):
                         neutral_directory=root / "neutral", out=output, err=io.StringIO())
             self.assertEqual(code, 0)
             self.assertIn("gemini: GEMINI_API_KEY not set", output.getvalue())
+            self.assertEqual(output.getvalue().count("warning: pricing:"), 1)
+            self.assertIn("warning: pricing: no price for gemini-3.8-flash; cost will be unknown",
+                          output.getvalue())
+
+    def test_doctor_does_not_warn_about_prices_without_api_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = root / "config"
+            config.mkdir()
+            roles = config / "roles.toml"
+            roles.write_text('[roles.coder]\nengine="codex"\nmodel="local-model"\n', encoding="utf-8")
+            def probe(argv: tuple[str, ...] | list[str]) -> ProcessResult:
+                return ProcessResult(0, "ok", "", 0.0, False)
+            output = io.StringIO()
+            main(["--config-dir", str(config), "--state-dir", str(root / "state"), "doctor"],
+                 doctor_probe=probe, home=root, neutral_directory=root / "neutral", out=output,
+                 err=io.StringIO())
+            self.assertNotIn("pricing:", output.getvalue())
 
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ You also need `git`, and whichever vendor CLIs you choose to use for roles (`cod
 
    Approval does not commit anything. Apply the worktree's change to your repository yourself.
 
-Other commands: `resume RUN_ID`, `switch ROLE MODEL`, `preflight`, `gc`, `doctor`.
+Other commands: `resume RUN_ID`, `switch ROLE MODEL`, `tune`, `gc`, `doctor`.
 Choose a role set with `--roles FILE`, for example
 `config/profiles-roles/subscription-only.toml` or `config/profiles-roles/hybrid-gemini-api.toml`.
 

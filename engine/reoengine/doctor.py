@@ -13,7 +13,7 @@ from typing import Literal
 from . import procs
 from ._data import loads, object_value
 from .adapters.claude import _validate_neutral_directory
-from .config import Engine, load_project, load_roles
+from .config import Engine, effective_roles, load_pricing, load_project, load_roles
 from .paths import neutral_path
 
 Probe = Callable[[Sequence[str]], procs.ProcessResult]
@@ -56,7 +56,15 @@ def diagnose(config_directory: Path, state_directory: Path, *, home: Path | None
         roles = load_roles(roles_file if roles_file is not None else config_directory / "roles.toml")
         defaults = {Engine.ANTHROPIC: "ANTHROPIC_API_KEY", Engine.OPENAI: "OPENAI_API_KEY",
                     Engine.GEMINI: "GEMINI_API_KEY"}
+        roles = effective_roles(roles, state_directory / "tuning.json", state_directory / "overrides.json")
         candidates = [candidate for role in roles.values() for candidate in (role, *role.replacements())]
+        pricing = load_pricing(config_directory / "pricing.toml")
+        missing_prices = sorted({candidate.model for candidate in candidates
+                                 if candidate.engine in {Engine.GEMINI, Engine.ANTHROPIC, Engine.OPENAI}
+                                 and candidate.model not in pricing})
+        checks.extend(Diagnostic("warning", "pricing",
+                                f"no price for {model}; cost will be unknown")
+                      for model in missing_prices)
         for engine in sorted({role.engine for role in candidates} & defaults.keys(), key=lambda item: item.value):
             env_name = next((role.api_key_env for role in candidates
                              if role.engine == engine and role.api_key_env), defaults[engine])

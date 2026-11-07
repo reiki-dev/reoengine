@@ -1,6 +1,5 @@
-"""Checkpointed S2 pipeline. No operation commits, pushes, merges, or accepts code.
+"""Checkpointed pipeline. No operation commits, pushes, merges, or accepts code.
 
-S3 supplies configuration reloads, adapters and (optionally) a rate-limit reader.
 An interrupted stage is repeated in full; completed artifacts are content checked.
 """
 from __future__ import annotations
@@ -12,6 +11,7 @@ import re
 import tempfile
 import uuid
 from collections.abc import Callable, Mapping
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -21,7 +21,7 @@ from .adapters.claude import _validate_neutral_directory
 from .config import Configuration, Engine, Profile, Project, RoleConfig, Sandbox, check_identifier
 from .events import Event, EventKind, EventLog, LimitRemaining, sha256_file
 from .gates import GateRequest, bounded_tail, plant_canary, risk_tier, run_gates, sanitize_output
-from .gitops import Diff, Git, SafetyError, ensure_safe_tree, normalized_path, tree_hash
+from .gitops import CANARY_PATH, Diff, Git, SafetyError, ensure_safe_tree, normalized_path, tree_hash
 from .guard import Category, OutsideGuard, SnapshotError
 from .jsonout import extract_json
 from .prompt import build_prompt
@@ -75,30 +75,6 @@ class RunInputs:
     task: dict[str, Json]
     plan: dict[str, Json] | None = None
     research: bool = False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 from .policy import _commands, _digest, _diff_path, _path_segments, _within_paths
@@ -440,10 +416,10 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
         return self.state
 
     def execute_stage(self, stage: Stage) -> dict[str, Json]:
-        """Execute/cache one explicit stage. Caller must hold the run lock.
+        """Execute or reuse one explicit stage. Caller must hold the run lock.
 
         Stage inputs include configuration and artifacts, so changing either cannot
-        reuse a stale result. This is also the S3 integration point for scheduling.
+        reuse a stale result.
         """
         if stage == Stage.IMPLEMENT and self.state.attempt == 0:
             self._save(attempt=1)
@@ -460,6 +436,9 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
             payload["tree"] = self._tree_stamp()
         if stage == Stage.IMPLEMENT:
             payload["feedback"] = self._feedback()
+            payload["research"] = self._research()
+        elif stage == Stage.PLAN:
+            payload["research"] = self._research()
         input_hash = _digest(payload)
         key = f"{stage.value}:{self.state.attempt}"
         artifact = self._artifact(stage)
@@ -494,6 +473,12 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
             # the paths gate can now emit its structured refusal.
             return "unsafe"
 
+    def _research(self) -> dict[str, Json] | None:
+        path = self.directory / "research.json"
+        if not self.inputs.research or not path.exists():
+            return None
+        return object_value(loads(path.read_text(encoding="utf-8")), "research")
+
     def _feedback(self) -> list[Json]:
         path = self.directory / "feedback.json"
         if not path.exists():
@@ -514,7 +499,9 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
             atomic_write(self.directory / "research.json", research)
             return research
         if stage == Stage.PLAN:
-            plan = self.inputs.plan or self._invoke("architect", {"task": self.inputs.task}, "plan", neutral=True)
+            plan = self.inputs.plan or self._invoke("architect",
+                                                    {"task": self.inputs.task, "research": self._research()},
+                                                    "plan", neutral=True)
             validate_artifact("plan", plan)
             self._validate_plan_paths(plan)
             self._resolve_checks(plan["acceptance_checks"], "plan.acceptance_checks")
@@ -522,7 +509,7 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
             return plan
         if stage == Stage.IMPLEMENT:
             return self._invoke("coder", {"task": self.inputs.task, "plan": self._plan(),
-                                           "feedback": self._feedback()}, None)
+                                           "feedback": self._feedback(), "research": self._research()}, None)
         if stage == Stage.GATES:
             return self._gates()
         if stage == Stage.REVIEW:
@@ -563,7 +550,6 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
                 self._event(EventKind.WORKTREE_EXCLUSIONS,
                             excluded_file_count=len(self.git.exclude_from_worktree))
         ensure_run_links(self.directory, self.project.links)
-        from .gitops import CANARY_PATH
         if not (self.git.root / CANARY_PATH).exists():
             plant_canary(self.git)
         limits = self._limits()
@@ -714,8 +700,7 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
                 return response
             if result.error == ErrorKind.QUOTA and index + 1 < len(candidates):
                 continue
-            # Keep only bounded failure tails with an explicit expiry; gc is S3.
-            from datetime import datetime, timedelta, timezone
+            # Keep only bounded failure tails with an explicit expiry.
             tail = bounded_tail(result.stdout_tail + result.stderr_tail, 4096)
             atomic_write(self.directory / "fail" / f"{self.state.stage.value}-{self.state.attempt}.json",
                          {"tail": tail, "expires_at": (datetime.now(timezone.utc) + timedelta(days=self.config.limits.failure_ttl_days)).isoformat()})
@@ -724,7 +709,6 @@ class Pipeline(ReviewMixin, AcceptMixin, GatesFixMixin):
         raise StageError("No adapter candidates")
 
     def _preserve_reader_tail(self, result: AgentResult, response_attempt: int) -> None:
-        from datetime import datetime, timedelta, timezone
         tail = bounded_tail(result.stdout_tail + result.stderr_tail, 4096)
         if result.final_message_path is not None:
             try:
