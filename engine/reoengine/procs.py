@@ -381,8 +381,13 @@ def run_process(
                     break
                 except subprocess.TimeoutExpired:
                     continue
-            if os.name == "posix" and process.poll() is not None and not reader_failed.is_set():
-                kill_tree_incomplete = _kill_tree(process, job, process_token) or kill_tree_incomplete
+            if sys.platform != "win32" and process.poll() is not None and not reader_failed.is_set():
+                # Cheap best-effort teardown of background children left in the process group;
+                # the full /proc walk is reserved for the timeout and error paths.
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
             # A child may inherit stdout even after its parent exits.
             for reader in readers:
                 reader.join(max(0.0, deadline - time.monotonic()))
